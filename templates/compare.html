@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Vergleich | BildungsRadar{% endblock %}
+
+{% block content %}
+<div class="compare-page">
+    <h2>Einrichtungen vergleichen</h2>
+    <a href="javascript:history.back()" class="back-link">Zurueck zu den Ergebnissen</a>
+
+    {% if institutions %}
+    <div class="compare-table-wrapper">
+        <table class="compare-table">
+            <thead>
+                <tr>
+                    <th>Kriterium</th>
+                    {% for inst in institutions %}
+                    <th>{{ inst.name }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Typ</strong></td>
+                    {% for inst in institutions %}
+                    <td><span class="type-badge type-{{ inst.type }}">{{ inst.type|capitalize }}</span></td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Bewertung</strong></td>
+                    {% for inst in institutions %}
+                    <td>
+                        <span class="stars">{{ "★" * (inst.rating|int) }}</span>
+                        {{ inst.rating }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Adresse</strong></td>
+                    {% for inst in institutions %}
+                    <td>{{ inst.address }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Preise</strong></td>
+                    {% for inst in institutions %}
+                    <td>
+                        {% if inst.analysis %}
+                            {{ inst.analysis.prices }}
+                        {% else %}
+                            <em>Analyse ausstehend</em>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Angebote</strong></td>
+                    {% for inst in institutions %}
+                    <td>
+                        {% if inst.analysis and inst.analysis.offerings %}
+                            <ul class="compare-list">
+                            {% for offer in inst.analysis.offerings %}
+                                <li>{{ offer }}</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <em>Analyse ausstehend</em>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Spezialisierungen</strong></td>
+                    {% for inst in institutions %}
+                    <td>
+                        {% if inst.analysis and inst.analysis.specializations %}
+                            <ul class="compare-list">
+                            {% for spec in inst.analysis.specializations %}
+                                <li>{{ spec }}</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <em>Analyse ausstehend</em>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Altersgruppen</strong></td>
+                    {% for inst in institutions %}
+                    <td>
+                        {% if inst.analysis %}
+                            {{ inst.analysis.age_groups }}
+                        {% else %}
+                            <em>Analyse ausstehend</em>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td><strong>Zusammenfassung</strong></td>
+                    {% for inst in institutions %}
+                    <td>
+                        {% if inst.analysis %}
+                            {{ inst.analysis.summary }}
+                        {% else %}
+                            <em>Analyse ausstehend</em>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="no-results">Keine Einrichtungen zum Vergleichen ausgewaehlt.</p>
+    {% endif %}
+</div>
+{% endblock %}

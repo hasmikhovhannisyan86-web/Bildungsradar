@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Ergebnisse - {{ location }} | BildungsRadar{% endblock %}
+
+{% block content %}
+<div class="results-page">
+    <h2>Ergebnisse fuer "{{ location }}"</h2>
+    <p class="result-count">{{ institutions|length }} Einrichtungen gefunden</p>
+
+    <!-- Filter-Toggles mit Zaehler -->
+    <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">
+            Alle <span class="badge">{{ institutions|length }}</span>
+        </button>
+        <button class="filter-btn" data-filter="kindergarten">
+            Kindergaerten <span class="badge">{{ counts.kindergarten }}</span>
+        </button>
+        <button class="filter-btn" data-filter="kita">
+            Kitas <span class="badge">{{ counts.kita }}</span>
+        </button>
+        <button class="filter-btn" data-filter="schule">
+            Schulen <span class="badge">{{ counts.schule }}</span>
+        </button>
+    </div>
+
+    <!-- Vergleich-Leiste -->
+    <div class="compare-bar" id="compare-bar" style="display:none;">
+        <span id="compare-count">0</span> ausgewaehlt
+        <button onclick="openCompare()" class="btn-compare">Vergleichen</button>
+    </div>
+
+    <!-- Ergebnis-Karten -->
+    <div class="institution-list">
+        {% for inst in institutions %}
+        <div class="institution-card" data-type="{{ inst.type }}">
+            <div class="card-header">
+                <div class="card-info">
+                    <h3>{{ inst.name }}</h3>
+                    <span class="type-badge type-{{ inst.type }}">{{ inst.type|capitalize }}</span>
+                </div>
+                <div class="card-rating">
+                    <span class="stars">{{ "★" * (inst.rating|int) }}{{ "☆" * (5 - inst.rating|int) }}</span>
+                    <span class="rating-number">{{ inst.rating }}</span>
+                    <span class="rating-count">({{ inst.total_ratings }} Bewertungen)</span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <p class="address">{{ inst.address }}</p>
+                {% if inst.phone %}
+                <p class="phone">Tel: {{ inst.phone }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Analyse-Bereich -->
+            <div class="card-analysis" id="analysis-{{ inst.id }}">
+                {% if inst.analysis %}
+                <div class="analysis-result">
+                    <h4>KI-Analyse</h4>
+                    <p><strong>Zusammenfassung:</strong> {{ inst.analysis.summary }}</p>
+                    <p><strong>Preise:</strong> {{ inst.analysis.prices }}</p>
+                    {% if inst.analysis.offerings %}
+                    <p><strong>Angebote:</strong> {{ inst.analysis.offerings|join(", ") }}</p>
+                    {% endif %}
+                    {% if inst.analysis.specializations %}
+                    <p><strong>Spezialisierungen:</strong> {{ inst.analysis.specializations|join(", ") }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="card-actions">
+                <button
+                    class="btn-analyze"
+                    onclick="analyzeInstitution({{ inst.id }}, this)"
+                    {% if inst.analysis %}disabled{% endif %}
+                >
+                    {% if inst.analysis %}Analysiert{% else %}KI-Analyse starten{% endif %}
+                </button>
+                <label class="compare-checkbox">
+                    <input type="checkbox" value="{{ inst.id }}" onchange="updateCompare()">
+                    Vergleichen
+                </label>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

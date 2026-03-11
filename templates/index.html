@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <h1>BildungsRadar</h1>
+    <p class="subtitle">Finde und vergleiche Kindergaerten, Kitas und Schulen in deiner Naehe.</p>
+
+    <form action="{{ url_for('search') }}" method="GET" class="search-form">
+        <div class="search-box">
+            <input
+                type="text"
+                name="location"
+                placeholder="Ort eingeben (z.B. Berlin Mitte)"
+                required
+                autofocus
+            >
+            <button type="submit">Suchen</button>
+        </div>
+    </form>
+
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">&#128269;</div>
+            <h3>Suchen</h3>
+            <p>Gib einen Ort ein und finde alle Bildungseinrichtungen in der Naehe.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#9881;</div>
+            <h3>Filtern</h3>
+            <p>Filtere nach Kindergaerten, Kitas oder Schulen mit einem Klick.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">&#129302;</div>
+            <h3>KI-Analyse</h3>
+            <p>Lass die KI Webseiten analysieren und Angebote vergleichen.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

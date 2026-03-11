@@ -1,0 +1,325 @@
+/* === BildungsRadar - Stylesheet === */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #f0f4f8;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* --- Navbar --- */
+.navbar {
+    background: #2c3e50;
+    padding: 15px 30px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.logo {
+    color: white;
+    text-decoration: none;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+/* --- Container --- */
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+/* --- Startseite (Hero) --- */
+.hero {
+    text-align: center;
+    padding: 60px 0 40px;
+}
+.hero h1 {
+    font-size: 2.8rem;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+.subtitle {
+    color: #666;
+    font-size: 1.15rem;
+    margin-bottom: 35px;
+}
+
+/* --- Suchformular --- */
+.search-form { margin-bottom: 50px; }
+.search-box {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    max-width: 550px;
+    margin: 0 auto;
+}
+.search-box input {
+    flex: 1;
+    padding: 14px 20px;
+    font-size: 1rem;
+    border: 2px solid #dde1e6;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.search-box input:focus { border-color: #3498db; }
+.search-box button {
+    padding: 14px 28px;
+    font-size: 1rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.search-box button:hover { background: #2980b9; }
+
+/* --- Feature-Karten auf Startseite --- */
+.features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    max-width: 700px;
+    margin: 0 auto;
+}
+.feature-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.feature-icon { font-size: 2rem; margin-bottom: 10px; }
+.feature-card h3 { margin-bottom: 6px; color: #2c3e50; }
+.feature-card p { color: #666; font-size: 0.9rem; }
+
+/* --- Ergebnisse --- */
+.results-page h2 { margin-bottom: 5px; }
+.result-count { color: #666; margin-bottom: 20px; }
+
+/* --- Filter-Leiste --- */
+.filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+.filter-btn {
+    padding: 8px 18px;
+    border: 2px solid #dde1e6;
+    border-radius: 20px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.filter-btn:hover { border-color: #3498db; }
+.filter-btn.active {
+    background: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+.badge {
+    background: rgba(0,0,0,0.1);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.filter-btn.active .badge { background: rgba(255,255,255,0.3); }
+
+/* --- Vergleich-Leiste --- */
+.compare-bar {
+    background: #2c3e50;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.btn-compare {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-compare:hover { background: #219a52; }
+
+/* --- Einrichtungs-Karten --- */
+.institution-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.institution-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s;
+}
+.institution-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.institution-card.hidden { display: none; }
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.card-info h3 { margin-bottom: 4px; }
+
+/* --- Typ-Badge --- */
+.type-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.type-kindergarten { background: #ffeaa7; color: #856404; }
+.type-kita { background: #dfe6e9; color: #2d3436; }
+.type-schule { background: #a29bfe; color: white; }
+
+/* --- Bewertung --- */
+.card-rating { text-align: right; }
+.stars { color: #f39c12; font-size: 1.1rem; }
+.rating-number { font-weight: 700; margin-left: 4px; }
+.rating-count { color: #999; font-size: 0.85rem; }
+
+/* --- Karten-Body --- */
+.card-body { margin-bottom: 10px; }
+.address, .phone { color: #666; font-size: 0.9rem; }
+
+/* --- Analyse-Bereich --- */
+.card-analysis { margin: 10px 0; }
+.analysis-result {
+    background: #f8f9fa;
+    border-left: 4px solid #3498db;
+    padding: 15px;
+    border-radius: 0 8px 8px 0;
+}
+.analysis-result h4 { color: #3498db; margin-bottom: 8px; }
+.analysis-result p { margin-bottom: 5px; font-size: 0.9rem; }
+.analysis-loading {
+    color: #666;
+    font-style: italic;
+    padding: 10px;
+}
+
+/* --- Karten-Aktionen --- */
+.card-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+.btn-analyze {
+    padding: 8px 18px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+.btn-analyze:hover { background: #2980b9; }
+.btn-analyze:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+}
+.compare-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* --- Vergleichsseite --- */
+.compare-page h2 { margin-bottom: 5px; }
+.back-link {
+    color: #3498db;
+    text-decoration: none;
+    display: inline-block;
+    margin-bottom: 20px;
+}
+.back-link:hover { text-decoration: underline; }
+
+.compare-table-wrapper { overflow-x: auto; }
+.compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.compare-table th,
+.compare-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+.compare-table th {
+    background: #2c3e50;
+    color: white;
+    font-weight: 600;
+}
+.compare-table th:first-child { background: #34495e; }
+.compare-table td:first-child {
+    background: #f8f9fa;
+    font-weight: 500;
+    min-width: 150px;
+}
+.compare-list {
+    list-style: none;
+    padding: 0;
+}
+.compare-list li {
+    padding: 2px 0;
+    font-size: 0.9rem;
+}
+.compare-list li::before {
+    content: "• ";
+    color: #3498db;
+}
+.no-results {
+    text-align: center;
+    color: #666;
+    padding: 40px;
+}
+
+/* --- Footer --- */
+.footer {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+    font-size: 0.85rem;
+    margin-top: 40px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+    .hero h1 { font-size: 2rem; }
+    .search-box { flex-direction: column; }
+    .card-header { flex-direction: column; }
+    .card-rating { text-align: left; }
+    .filter-bar { gap: 6px; }
+}

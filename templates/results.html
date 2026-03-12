@@ -5,7 +5,10 @@
 {% block content %}
 <div class="results-page">
     <h2>Ergebnisse fuer "{{ location }}"</h2>
-    <p class="result-count">{{ institutions|length }} Einrichtungen gefunden</p>
+    <p class="result-count">
+        {{ institutions|length }} Einrichtungen gefunden
+        {% if cached %}<span class="cache-badge">aus Datenbank geladen</span>{% endif %}
+    </p>
 
     <!-- Filter-Toggles mit Zaehler -->
     <div class="filter-bar">
@@ -13,13 +16,16 @@
             Alle <span class="badge">{{ institutions|length }}</span>
         </button>
         <button class="filter-btn" data-filter="kindergarten">
-            Kindergaerten <span class="badge">{{ counts.kindergarten }}</span>
+            &#127979; Kindergaerten <span class="badge">{{ counts.kindergarten }}</span>
         </button>
         <button class="filter-btn" data-filter="kita">
-            Kitas <span class="badge">{{ counts.kita }}</span>
+            &#128118; Kitas <span class="badge">{{ counts.kita }}</span>
         </button>
         <button class="filter-btn" data-filter="schule">
-            Schulen <span class="badge">{{ counts.schule }}</span>
+            &#127891; Schulen <span class="badge">{{ counts.schule }}</span>
+        </button>
+        <button class="filter-btn" data-filter="privatschule">
+            &#11088; Privatschulen <span class="badge">{{ counts.privatschule }}</span>
         </button>
     </div>
 
@@ -35,20 +41,35 @@
         <div class="institution-card" data-type="{{ inst.type }}">
             <div class="card-header">
                 <div class="card-info">
-                    <h3>{{ inst.name }}</h3>
+                    <div class="card-title-row">
+                        <span class="type-icon">
+                            {% if inst.type == 'kindergarten' %}&#127979;
+                            {% elif inst.type == 'kita' %}&#128118;
+                            {% elif inst.type == 'privatschule' %}&#11088;
+                            {% else %}&#127891;{% endif %}
+                        </span>
+                        <h3>{{ inst.name }}</h3>
+                    </div>
                     <span class="type-badge type-{{ inst.type }}">{{ inst.type|capitalize }}</span>
                 </div>
-                <div class="card-rating">
-                    <span class="stars">{{ "★" * (inst.rating|int) }}{{ "☆" * (5 - inst.rating|int) }}</span>
-                    <span class="rating-number">{{ inst.rating }}</span>
-                    <span class="rating-count">({{ inst.total_ratings }} Bewertungen)</span>
+                <div class="card-right">
+                    <button
+                        class="btn-favorite {% if inst.is_favorite %}active{% endif %}"
+                        onclick="toggleFavorite({{ inst.id }}, this)"
+                        title="Favorit"
+                    >
+                        {% if inst.is_favorite %}&#9829;{% else %}&#9825;{% endif %}
+                    </button>
                 </div>
             </div>
 
             <div class="card-body">
-                <p class="address">{{ inst.address }}</p>
+                <p class="address">&#128205; {{ inst.address }}</p>
                 {% if inst.phone %}
-                <p class="phone">Tel: {{ inst.phone }}</p>
+                <p class="phone">&#128222; {{ inst.phone }}</p>
+                {% endif %}
+                {% if inst.website %}
+                <p class="website">&#127760; <a href="{{ inst.website }}" target="_blank">Webseite</a></p>
                 {% endif %}
             </div>
 
@@ -56,7 +77,7 @@
             <div class="card-analysis" id="analysis-{{ inst.id }}">
                 {% if inst.analysis %}
                 <div class="analysis-result">
-                    <h4>KI-Analyse</h4>
+                    <h4>&#129302; KI-Analyse</h4>
                     <p><strong>Zusammenfassung:</strong> {{ inst.analysis.summary }}</p>
                     <p><strong>Preise:</strong> {{ inst.analysis.prices }}</p>
                     {% if inst.analysis.offerings %}

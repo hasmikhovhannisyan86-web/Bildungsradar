@@ -9,6 +9,9 @@ import config
 
 app = Flask(__name__)
 
+# Datenbank beim Start initialisieren
+database.init_db()
+
 
 # --- Seiten-Routen ---
 
@@ -25,29 +28,39 @@ def search():
     if not location:
         return redirect(url_for("index"))
 
-    # Google Maps Suche ausfuehren
-    from google_maps_service import search_institutions
-    results = search_institutions(location)
+    # Pruefen ob Ergebnisse bereits in der Datenbank gespeichert sind (Caching)
+    cached_search_id = database.find_cached_search(location)
 
-    # Suchanfrage in DB speichern
-    search_id = database.save_search(location)
+    if cached_search_id:
+        # Gespeicherte Ergebnisse aus DB laden (schnell!)
+        search_id = cached_search_id
+        print(f"Cache-Treffer fuer '{location}' (search_id={search_id})")
+    else:
+        # Neue Suche ueber OpenStreetMap ausfuehren
+        from google_maps_service import search_institutions
+        results = search_institutions(location)
 
-    # Ergebnisse in DB speichern und verknuepfen
-    for item in results:
-        inst_id = database.save_institution(item)
-        if inst_id:
-            database.link_search_result(search_id, inst_id)
+        # Suchanfrage in DB speichern
+        search_id = database.save_search(location)
+
+        # Ergebnisse in DB speichern und verknuepfen
+        for item in results:
+            inst_id = database.save_institution(item)
+            if inst_id:
+                database.link_search_result(search_id, inst_id)
+
+        print(f"Neue Suche fuer '{location}': {len(results)} Ergebnisse gespeichert")
 
     # Ergebnisse aus DB laden (sortiert nach Bewertung)
     institutions = database.get_search_results(search_id)
 
-    # Bereits vorhandene Analysen laden
+    # Analysen und Favoriten-Status laden
     for inst in institutions:
-        analysis = database.get_analysis(inst["id"])
-        inst["analysis"] = analysis
+        inst["analysis"] = database.get_analysis(inst["id"])
+        inst["is_favorite"] = database.is_favorite(inst["id"])
 
     # Zaehler pro Kategorie berechnen
-    counts = {"kindergarten": 0, "kita": 0, "schule": 0}
+    counts = {"kindergarten": 0, "kita": 0, "schule": 0, "privatschule": 0}
     for inst in institutions:
         t = inst.get("type", "").lower()
         if t in counts:
@@ -58,8 +71,22 @@ def search():
         location=location,
         institutions=institutions,
         search_id=search_id,
-        counts=counts
+        counts=counts,
+        cached=cached_search_id is not None
     )
+
+
+@app.route("/favorites")
+def favorites():
+    """Favoriten-Seite: Alle markierten Einrichtungen anzeigen."""
+    institutions = database.get_all_favorites()
+
+    # Analysen laden
+    for inst in institutions:
+        inst["analysis"] = database.get_analysis(inst["id"])
+        inst["is_favorite"] = True
+
+    return render_template("favorites.html", institutions=institutions)
 
 
 @app.route("/compare")
@@ -72,7 +99,6 @@ def compare():
     ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
     analyses = database.get_all_analyses(ids)
 
-    # Auch Einrichtungen ohne Analyse laden
     institutions = []
     for inst_id in ids:
         inst = database.get_institution(inst_id)
@@ -99,7 +125,6 @@ def analyze_institution(institution_id):
     from openai_service import analyze_website
     analysis = analyze_website(institution)
 
-    # Analyse in DB speichern
     database.save_analysis(
         institution_id,
         analysis,
@@ -109,6 +134,17 @@ def analyze_institution(institution_id):
     )
 
     return jsonify({"success": True, "analysis": analysis})
+
+
+@app.route("/api/favorite/<int:institution_id>", methods=["POST"])
+def toggle_favorite(institution_id):
+    """Favorit hinzufuegen oder entfernen."""
+    if database.is_favorite(institution_id):
+        database.remove_favorite(institution_id)
+        return jsonify({"success": True, "is_favorite": False})
+    else:
+        database.add_favorite(institution_id)
+        return jsonify({"success": True, "is_favorite": True})
 
 
 @app.route("/api/institution/<int:institution_id>")
@@ -140,7 +176,7 @@ def delete_institution_route(institution_id):
 
 if __name__ == "__main__":
     database.init_db()
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5001))
     print("BildungsRadar gestartet!")
     print(f"Demo-Modus: {'AN' if config.DEMO_MODE else 'AUS'}")
     print(f"Oeffne http://localhost:{port} im Browser")

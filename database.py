@@ -68,10 +68,32 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (institution_id) REFERENCES institutions(id)
         );
+
+        CREATE TABLE IF NOT EXISTS favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            institution_id INTEGER UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (institution_id) REFERENCES institutions(id)
+        );
     """)
 
     conn.commit()
     conn.close()
+
+
+# --- Caching: Pruefen ob Suchergebnisse bereits vorhanden ---
+
+def find_cached_search(location_name):
+    """Pruefen ob fuer diesen Ort bereits Ergebnisse in der DB gespeichert sind."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM searches WHERE LOWER(location_name) = LOWER(?) LIMIT 1",
+        (location_name.strip(),)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row["id"] if row else None
 
 
 # --- CRUD Operationen fuer Suchanfragen ---
@@ -269,5 +291,58 @@ def get_all_analyses(institution_ids):
         r["offerings"] = json.loads(r["offerings"]) if r["offerings"] else []
         r["specializations"] = json.loads(r["specializations"]) if r["specializations"] else []
         results.append(r)
+    conn.close()
+    return results
+
+
+# --- Favoriten ---
+
+def add_favorite(institution_id):
+    """Einrichtung als Favorit markieren."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR IGNORE INTO favorites (institution_id) VALUES (?)",
+        (institution_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_favorite(institution_id):
+    """Einrichtung aus Favoriten entfernen."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM favorites WHERE institution_id = ?",
+        (institution_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def is_favorite(institution_id):
+    """Pruefen ob eine Einrichtung ein Favorit ist."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id FROM favorites WHERE institution_id = ?",
+        (institution_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
+
+
+def get_all_favorites():
+    """Alle Favoriten mit Einrichtungsdetails laden."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT i.* FROM institutions i
+        JOIN favorites f ON i.id = f.institution_id
+        ORDER BY f.created_at DESC
+    """)
+    results = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return results

@@ -96,3 +96,31 @@ function openCompare() {
         window.location.href = "/compare?ids=" + ids.join(",");
     }
 }
+
+
+// --- Favoriten-Funktion ---
+function toggleFavorite(institutionId, button) {
+    fetch("/api/favorite/" + institutionId, { method: "POST" })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (data.success) {
+                if (data.is_favorite) {
+                    button.classList.add("active");
+                    button.innerHTML = "&#9829;";
+                    button.title = "Favorit entfernen";
+                } else {
+                    button.classList.remove("active");
+                    button.innerHTML = "&#9825;";
+                    button.title = "Favorit";
+                    // Auf der Favoriten-Seite: Karte ausblenden
+                    var card = button.closest(".institution-card");
+                    if (card && window.location.pathname === "/favorites") {
+                        card.style.opacity = "0.3";
+                    }
+                }
+            }
+        })
+        .catch(function (error) {
+            console.error("Favoriten-Fehler:", error);
+        });
+}

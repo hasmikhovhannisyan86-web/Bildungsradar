@@ -14,6 +14,9 @@ body {
     background: #2c3e50;
     padding: 15px 30px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 .logo {
     color: white;
@@ -21,6 +24,14 @@ body {
     font-size: 1.4rem;
     font-weight: 700;
 }
+.nav-links { display: flex; gap: 20px; }
+.nav-link {
+    color: #ecf0f1;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.2s;
+}
+.nav-link:hover { color: #e74c3c; }
 
 /* --- Container --- */
 .container {
@@ -98,6 +109,14 @@ body {
 /* --- Ergebnisse --- */
 .results-page h2 { margin-bottom: 5px; }
 .result-count { color: #666; margin-bottom: 20px; }
+.cache-badge {
+    background: #27ae60;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    margin-left: 8px;
+}
 
 /* --- Filter-Leiste --- */
 .filter-bar {
@@ -179,7 +198,14 @@ body {
     flex-wrap: wrap;
     gap: 10px;
 }
-.card-info h3 { margin-bottom: 4px; }
+.card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.type-icon { font-size: 1.5rem; }
+.card-info h3 { margin-bottom: 0; }
 
 /* --- Typ-Badge --- */
 .type-badge {
@@ -192,16 +218,35 @@ body {
 .type-kindergarten { background: #ffeaa7; color: #856404; }
 .type-kita { background: #dfe6e9; color: #2d3436; }
 .type-schule { background: #a29bfe; color: white; }
+.type-privatschule { background: #fd79a8; color: white; }
 
-/* --- Bewertung --- */
-.card-rating { text-align: right; }
-.stars { color: #f39c12; font-size: 1.1rem; }
-.rating-number { font-weight: 700; margin-left: 4px; }
-.rating-count { color: #999; font-size: 0.85rem; }
+/* --- Favorit-Button --- */
+.btn-favorite {
+    background: none;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 1.3rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #ccc;
+}
+.btn-favorite:hover {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+.btn-favorite.active {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: white;
+}
 
 /* --- Karten-Body --- */
 .card-body { margin-bottom: 10px; }
-.address, .phone { color: #666; font-size: 0.9rem; }
+.address, .phone, .website { color: #666; font-size: 0.9rem; margin-bottom: 2px; }
+.website a { color: #3498db; text-decoration: none; }
+.website a:hover { text-decoration: underline; }
 
 /* --- Analyse-Bereich --- */
 .card-analysis { margin: 10px 0; }
@@ -251,6 +296,26 @@ body {
     color: #666;
 }
 
+/* --- Favoriten-Seite --- */
+.favorites-page h2 { margin-bottom: 5px; }
+.empty-favorites {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+.empty-icon { font-size: 4rem; margin-bottom: 15px; }
+.btn-search {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 12px 28px;
+    background: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 600;
+}
+.btn-search:hover { background: #2980b9; }
+
 /* --- Vergleichsseite --- */
 .compare-page h2 { margin-bottom: 5px; }
 .back-link {
@@ -297,7 +362,7 @@ body {
     font-size: 0.9rem;
 }
 .compare-list li::before {
-    content: "• ";
+    content: "\2022 ";
     color: #3498db;
 }
 .no-results {
@@ -320,6 +385,6 @@ body {
     .hero h1 { font-size: 2rem; }
     .search-box { flex-direction: column; }
     .card-header { flex-direction: column; }
-    .card-rating { text-align: left; }
     .filter-bar { gap: 6px; }
+    .navbar { flex-direction: column; gap: 10px; }
 }

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Meine Favoriten | BildungsRadar{% endblock %}
+
+{% block content %}
+<div class="favorites-page">
+    <h2>&#9829; Meine Favoriten</h2>
+
+    {% if institutions %}
+    <p class="result-count">{{ institutions|length }} gespeicherte Einrichtungen</p>
+
+    <div class="institution-list">
+        {% for inst in institutions %}
+        <div class="institution-card" data-type="{{ inst.type }}">
+            <div class="card-header">
+                <div class="card-info">
+                    <div class="card-title-row">
+                        <span class="type-icon">
+                            {% if inst.type == 'kindergarten' %}&#127979;
+                            {% elif inst.type == 'kita' %}&#128118;
+                            {% elif inst.type == 'privatschule' %}&#11088;
+                            {% else %}&#127891;{% endif %}
+                        </span>
+                        <h3>{{ inst.name }}</h3>
+                    </div>
+                    <span class="type-badge type-{{ inst.type }}">{{ inst.type|capitalize }}</span>
+                </div>
+                <div class="card-right">
+                    <button
+                        class="btn-favorite active"
+                        onclick="toggleFavorite({{ inst.id }}, this)"
+                        title="Favorit entfernen"
+                    >&#9829;</button>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <p class="address">&#128205; {{ inst.address }}</p>
+                {% if inst.phone %}
+                <p class="phone">&#128222; {{ inst.phone }}</p>
+                {% endif %}
+                {% if inst.website %}
+                <p class="website">&#127760; <a href="{{ inst.website }}" target="_blank">Webseite</a></p>
+                {% endif %}
+            </div>
+
+            {% if inst.analysis %}
+            <div class="card-analysis">
+                <div class="analysis-result">
+                    <h4>&#129302; KI-Analyse</h4>
+                    <p><strong>Zusammenfassung:</strong> {{ inst.analysis.summary }}</p>
+                    <p><strong>Preise:</strong> {{ inst.analysis.prices }}</p>
+                    {% if inst.analysis.offerings %}
+                    <p><strong>Angebote:</strong> {{ inst.analysis.offerings|join(", ") }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-favorites">
+        <p class="empty-icon">&#9825;</p>
+        <p>Du hast noch keine Favoriten gespeichert.</p>
+        <a href="{{ url_for('index') }}" class="btn-search">Jetzt suchen</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

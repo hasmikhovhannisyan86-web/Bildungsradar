@@ -35,10 +35,23 @@ function analyzeInstitution(institutionId, button) {
     button.disabled = true;
     button.textContent = "Analysiere...";
 
-    var analysisDiv = document.getElementById("analysis-" + institutionId);
-    analysisDiv.innerHTML = '<p class="analysis-loading">KI analysiert die Webseite...</p>';
+    // Prompt-Version und Temperature aus den Dropdowns lesen
+    var promptSelect = document.getElementById("prompt-" + institutionId);
+    var tempSelect = document.getElementById("temp-" + institutionId);
+    var promptVersion = promptSelect ? promptSelect.value : "v2";
+    var temperature = tempSelect ? parseFloat(tempSelect.value) : 0.3;
 
-    fetch("/api/analyze/" + institutionId, { method: "POST" })
+    var analysisDiv = document.getElementById("analysis-" + institutionId);
+    analysisDiv.innerHTML = '<p class="analysis-loading">KI analysiert...</p>';
+
+    fetch("/api/analyze/" + institutionId, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            prompt_version: promptVersion,
+            temperature: temperature
+        })
+    })
         .then(function (response) { return response.json(); })
         .then(function (data) {
             if (data.success) {
@@ -57,7 +70,8 @@ function analyzeInstitution(institutionId, button) {
 
                 html += "</div>";
                 analysisDiv.innerHTML = html;
-                button.textContent = "Analysiert";
+                button.textContent = "Erneut analysieren";
+                button.disabled = false;
             } else {
                 analysisDiv.innerHTML = '<p class="analysis-loading">Fehler bei der Analyse.</p>';
                 button.textContent = "Erneut versuchen";

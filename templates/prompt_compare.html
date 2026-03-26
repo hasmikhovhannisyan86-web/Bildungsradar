@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Prompt-Vergleich | BildungsRadar{% endblock %}
+
+{% block content %}
+<div class="prompt-compare-page">
+    <h2>Prompt-Vergleich</h2>
+    <p class="subtitle">Vergleiche wie verschiedene KI-Prompts die gleiche Einrichtung analysieren.</p>
+
+    <!-- Einrichtung suchen -->
+    <div class="experiment-setup">
+        <div class="search-box">
+            <label><strong>Einrichtung suchen:</strong></label>
+            <input type="text" id="inst-search" placeholder="z.B. Waldorfschule, Montessori..."
+                   autocomplete="off" style="width:300px; padding:8px; border-radius:6px; border:1px solid #ccc;">
+            <div id="search-results" style="display:none; position:absolute; background:white; border:1px solid #ddd; border-radius:6px; max-height:200px; overflow-y:auto; z-index:100; width:400px; box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+        </div>
+        <p style="color:#888; font-size:0.85em; margin-top:5px;">
+            Tipp: Suche zuerst auf der <a href="/">Startseite</a> nach einem Ort, damit Einrichtungen in der Datenbank sind.
+        </p>
+    </div>
+
+    {% if institution %}
+    <div class="experiment-target" style="background:white; padding:20px; border-radius:10px; margin:20px 0; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <h3 style="margin-top:0;">{{ institution.name }}</h3>
+        <p class="address">{{ institution.address }}</p>
+        {% if institution.website %}
+        <p class="website"><a href="{{ institution.website }}" target="_blank">{{ institution.website }}</a></p>
+        {% endif %}
+
+        <button class="btn-analyze" onclick="runAllPrompts({{ institution.id }})" id="btn-run-all"
+                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 12px 30px; font-size: 1.1em; margin-top:10px;">
+            Alle 3 Prompts vergleichen
+        </button>
+        <div id="progress-bar" style="display:none; margin-top:15px;">
+            <div style="background:#e0e0e0; border-radius:10px; overflow:hidden; height:24px;">
+                <div id="progress-fill" style="background: linear-gradient(90deg, #667eea, #764ba2); height:100%; width:0%; transition: width 0.5s; border-radius:10px; display:flex; align-items:center; justify-content:center; color:white; font-size:0.85em; font-weight:bold;"></div>
+            </div>
+            <p id="progress-text" style="text-align:center; color:#666; margin-top:5px;"></p>
+        </div>
+    </div>
+
+    <!-- Ergebnis-Tabelle -->
+    {% if analyses %}
+    <div class="experiment-results">
+        <h3>Vergleichsergebnisse ({{ analyses|length }} Analysen)</h3>
+        <div class="compare-table-wrapper" style="overflow-x:auto;">
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th style="min-width:140px;">Kriterium</th>
+                        {% for a in analyses %}
+                        <th style="min-width:220px;">
+                            <span class="prompt-badge" style="
+                                {% if a.prompt_version == 'v1' %}background:#4CAF50;
+                                {% elif a.prompt_version == 'v2' %}background:#2196F3;
+                                {% else %}background:#9C27B0;{% endif %}
+                                color:white; padding:3px 10px; border-radius:12px; font-size:0.85em;">
+                                {{ a.prompt_version }}
+                                {% if a.prompt_version == 'v1' %}Basic
+                                {% elif a.prompt_version == 'v2' %}Few-Shot
+                                {% else %}Chain-of-Thought{% endif %}
+                            </span>
+                            <br><small style="color:#888;">T={{ a.temperature }}</small>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Zusammenfassung</strong></td>
+                        {% for a in analyses %}
+                        <td>{{ a.summary or 'Keine Angabe' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Bewertung</strong></td>
+                        {% for a in analyses %}
+                        <td>
+                            {% if a.rating and a.rating != 'Keine Angabe' %}
+                            <span style="color:#f5a623; font-size:1.2em;">{{ "★" * (a.rating|string|float|int) }}</span> {{ a.rating }}
+                            {% else %}
+                            <em>Keine Angabe</em>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Preise</strong></td>
+                        {% for a in analyses %}
+                        <td>{{ a.prices or 'Keine Angabe' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Angebote</strong></td>
+                        {% for a in analyses %}
+                        <td>
+                            {% if a.offerings %}
+                            <ul class="compare-list">
+                                {% for o in a.offerings %}
+                                <li>{{ o }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}Keine Angabe{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Spezialisierungen</strong></td>
+                        {% for a in analyses %}
+                        <td>
+                            {% if a.specializations %}
+                            <ul class="compare-list">
+                                {% for s in a.specializations %}
+                                <li>{{ s }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}Keine Angabe{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Altersgruppen</strong></td>
+                        {% for a in analyses %}
+                        <td>{{ a.age_groups or 'Keine Angabe' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Modell</strong></td>
+                        {% for a in analyses %}
+                        <td><code>{{ a.model_used }}</code></td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% elif not institution and not request.args.get('institution_id') %}
+    <div style="text-align:center; padding:40px; color:#888;">
+        <p style="font-size:1.2em;">Suche oben nach einer Einrichtung, um den Vergleich zu starten.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Suche nach Einrichtungen
+var searchInput = document.getElementById("inst-search");
+var searchResults = document.getElementById("search-results");
+var searchTimeout;
+
+if (searchInput) {
+    searchInput.addEventListener("input", function() {
+        clearTimeout(searchTimeout);
+        var query = this.value.trim();
+        if (query.length < 2) {
+            searchResults.style.display = "none";
+            return;
+        }
+        searchTimeout = setTimeout(function() {
+            fetch("/api/search-institutions?q=" + encodeURIComponent(query))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.length === 0) {
+                        searchResults.innerHTML = '<div style="padding:12px; color:#888;">Keine Einrichtungen gefunden. Suche zuerst auf der Startseite nach einem Ort.</div>';
+                        searchResults.style.display = "block";
+                        return;
+                    }
+                    var html = "";
+                    data.forEach(function(inst) {
+                        html += '<div style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #eee; transition:background 0.2s;" ' +
+                            'onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'white\'" ' +
+                            'onclick="window.location=\'/prompt-compare?institution_id=' + inst.id + '\'">' +
+                            '<strong>' + inst.name + '</strong><br>' +
+                            '<small style="color:#888;">' + (inst.type || '') + ' | ' + (inst.address || '') + '</small></div>';
+                    });
+                    searchResults.innerHTML = html;
+                    searchResults.style.display = "block";
+                });
+        }, 300);
+    });
+
+    document.addEventListener("click", function(e) {
+        if (e.target !== searchInput) {
+            searchResults.style.display = "none";
+        }
+    });
+}
+
+// Alle 3 Prompts nacheinander ausfuehren
+function runAllPrompts(institutionId) {
+    var btn = document.getElementById("btn-run-all");
+    btn.disabled = true;
+    btn.textContent = "Analyse laeuft...";
+
+    var progressBar = document.getElementById("progress-bar");
+    var progressFill = document.getElementById("progress-fill");
+    var progressText = document.getElementById("progress-text");
+    progressBar.style.display = "block";
+
+    var prompts = [
+        {version: "v1", name: "v1 Basic", temp: 0.3},
+        {version: "v2", name: "v2 Few-Shot", temp: 0.3},
+        {version: "v3", name: "v3 Chain-of-Thought", temp: 0.3}
+    ];
+
+    var current = 0;
+
+    function runNext() {
+        if (current >= prompts.length) {
+            progressFill.style.width = "100%";
+            progressFill.textContent = "Fertig!";
+            progressText.textContent = "Alle Analysen abgeschlossen! Seite wird neu geladen...";
+            setTimeout(function() { location.reload(); }, 1000);
+            return;
+        }
+
+        var p = prompts[current];
+        var percent = Math.round(((current) / prompts.length) * 100);
+        progressFill.style.width = percent + "%";
+        progressFill.textContent = percent + "%";
+        progressText.textContent = "Analysiere mit " + p.name + "... (" + (current + 1) + "/" + prompts.length + ")";
+
+        fetch("/api/analyze/" + institutionId, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                prompt_version: p.version,
+                temperature: p.temp
+            })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            current++;
+            runNext();
+        })
+        .catch(function(err) {
+            progressText.textContent = "Fehler bei " + p.name + ": " + err.message;
+            current++;
+            runNext();
+        });
+    }
+
+    runNext();
+}
+</script>
+{% endblock %}

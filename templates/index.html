@@ -5,18 +5,71 @@
     <h1>BildungsRadar</h1>
     <p class="subtitle">Finde und vergleiche Kindergaerten, Kitas und Schulen in deiner Naehe.</p>
 
-    <form action="{{ url_for('search') }}" method="GET" class="search-form">
+    <form id="search-form" action="{{ url_for('search') }}" method="GET" class="search-form">
         <div class="search-box">
             <input
                 type="text"
+                id="search-input"
                 name="location"
-                placeholder="Ort eingeben (z.B. Berlin Mitte)"
+                placeholder="z.B. 'Ich suche Kitas in Berlin Mitte' oder einfach 'Berlin Mitte'"
                 required
                 autofocus
             >
-            <button type="submit">Suchen</button>
+            <button type="submit" id="search-btn">Suchen</button>
         </div>
+        <p id="nlp-status" style="margin-top: 8px; font-size: 0.9em; color: #666; display: none;"></p>
     </form>
+
+    <script>
+    document.getElementById('search-form').addEventListener('submit', async function(e) {
+        const input = document.getElementById('search-input');
+        const status = document.getElementById('nlp-status');
+        const btn = document.getElementById('search-btn');
+        const text = input.value.trim();
+
+        if (!text) return;
+
+        // Freitext erkennen: wenn mehr als 3 Woerter oder typische Satzwoerter
+        const nlpWords = ['suche', 'finde', 'zeig', 'wo', 'gibt', 'brauche', 'möchte',
+                          'will', 'naehe', 'nähe', 'schulen', 'kita', 'kindergarten',
+                          'schule', 'kindergärten', 'kitas'];
+        const isNaturalLanguage = text.split(/\s+/).length > 3 ||
+            nlpWords.some(w => text.toLowerCase().includes(w));
+
+        if (!isNaturalLanguage) return; // Kurzer Ortsname -> normal weiterleiten
+
+        e.preventDefault();
+        status.style.display = 'block';
+        status.textContent = 'Ort wird aus deinem Text extrahiert...';
+        btn.disabled = true;
+
+        try {
+            const resp = await fetch('/api/extract-location', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text})
+            });
+            const data = await resp.json();
+
+            if (data.location) {
+                let url = '/search?location=' + encodeURIComponent(data.location);
+                if (data.type) {
+                    url += '&type=' + encodeURIComponent(data.type);
+                    status.textContent = 'Erkannt: ' + data.location + ' (' + data.type + ') – Suche wird gestartet...';
+                } else {
+                    status.textContent = 'Erkannter Ort: ' + data.location + ' – Suche wird gestartet...';
+                }
+                window.location.href = url;
+            } else {
+                status.textContent = 'Kein Ort erkannt. Bitte gib einen Ortsnamen ein.';
+                btn.disabled = false;
+            }
+        } catch (err) {
+            status.textContent = 'Fehler bei der Verarbeitung. Bitte versuche es erneut.';
+            btn.disabled = false;
+        }
+    });
+    </script>
 
     <div class="features">
         <div class="feature-card">

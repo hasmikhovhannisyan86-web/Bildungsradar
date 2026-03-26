@@ -97,6 +97,24 @@ def compare():
         return redirect(url_for("index"))
 
     ids = [int(x) for x in ids_str.split(",") if x.strip().isdigit()]
+
+    # Auto-Analyse: Einrichtungen ohne Analyse automatisch analysieren
+    from openai_service import analyze_website
+    for inst_id in ids:
+        existing = database.get_analysis(inst_id)
+        if not existing:
+            inst = database.get_institution(inst_id)
+            if inst:
+                try:
+                    analysis = analyze_website(inst, "v2", config.OPENAI_TEMPERATURE)
+                    database.save_analysis(
+                        inst_id, analysis, config.OPENAI_MODEL,
+                        config.OPENAI_TEMPERATURE, "v2"
+                    )
+                    print(f"Auto-Analyse fuer '{inst.get('name', inst_id)}' abgeschlossen")
+                except Exception as e:
+                    print(f"Auto-Analyse fehlgeschlagen fuer {inst_id}: {e}")
+
     analyses = database.get_all_analyses(ids)
 
     institutions = []
@@ -122,18 +140,70 @@ def analyze_institution(institution_id):
     if not institution:
         return jsonify({"error": "Einrichtung nicht gefunden"}), 404
 
+    # Prompt-Version und Temperature aus Request lesen (oder Defaults)
+    data = request.get_json(silent=True) or {}
+    prompt_version = data.get("prompt_version", "v2")
+    temperature = data.get("temperature", config.OPENAI_TEMPERATURE)
+    temperature = float(temperature)
+
     from openai_service import analyze_website
-    analysis = analyze_website(institution)
+    analysis = analyze_website(institution, prompt_version, temperature)
 
     database.save_analysis(
         institution_id,
         analysis,
         config.OPENAI_MODEL,
-        config.OPENAI_TEMPERATURE,
-        "v2"
+        temperature,
+        prompt_version
     )
 
-    return jsonify({"success": True, "analysis": analysis})
+    return jsonify({
+        "success": True,
+        "analysis": analysis,
+        "prompt_version": prompt_version,
+        "temperature": temperature
+    })
+
+
+@app.route("/api/prompt-versions")
+def prompt_versions():
+    """Alle verfuegbaren Prompt-Versionen zurueckgeben."""
+    from openai_service import get_prompt_versions
+    return jsonify(get_prompt_versions())
+
+
+@app.route("/prompt-compare")
+def prompt_compare():
+    """Prompt-Vergleichsseite: Verschiedene Prompts & Temperatures vergleichen."""
+    institution_id = request.args.get("institution_id", type=int)
+    institution = None
+    analyses = []
+
+    if institution_id:
+        institution = database.get_institution(institution_id)
+        analyses = database.get_all_analyses_for_institution(institution_id)
+
+    from openai_service import get_prompt_versions
+    versions = get_prompt_versions()
+    temperatures = [0.1, 0.3, 0.5, 0.7, 1.0]
+
+    return render_template(
+        "prompt_compare.html",
+        institution=institution,
+        analyses=analyses,
+        versions=versions,
+        temperatures=temperatures
+    )
+
+
+@app.route("/api/search-institutions")
+def api_search_institutions():
+    """API: Einrichtungen nach Name in der DB suchen."""
+    query = request.args.get("q", "").strip()
+    if not query or len(query) < 2:
+        return jsonify([])
+    results = database.search_institutions_by_name(query)
+    return jsonify(results)
 
 
 @app.route("/api/favorite/<int:institution_id>", methods=["POST"])

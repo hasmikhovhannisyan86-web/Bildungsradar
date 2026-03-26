@@ -29,8 +29,15 @@
                     <td><strong>Bewertung</strong></td>
                     {% for inst in institutions %}
                     <td>
+                        {% if inst.analysis and inst.analysis.rating and inst.analysis.rating != 'Keine Angabe' %}
+                        <span class="stars">{{ "★" * (inst.analysis.rating|float|int) }}</span>
+                        {{ inst.analysis.rating }}
+                        {% elif inst.rating and inst.rating > 0 %}
                         <span class="stars">{{ "★" * (inst.rating|int) }}</span>
                         {{ inst.rating }}
+                        {% else %}
+                        <em>Analyse starten um Bewertung zu laden</em>
+                        {% endif %}
                     </td>
                     {% endfor %}
                 </tr>

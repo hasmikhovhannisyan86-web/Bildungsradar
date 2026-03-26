@@ -84,13 +84,18 @@ def init_db():
 # --- Caching: Pruefen ob Suchergebnisse bereits vorhanden ---
 
 def find_cached_search(location_name):
-    """Pruefen ob fuer diesen Ort bereits Ergebnisse in der DB gespeichert sind."""
+    """Pruefen ob fuer diesen Ort bereits Ergebnisse in der DB gespeichert sind.
+    Gibt nur Suchen zurueck die auch tatsaechlich Ergebnisse haben."""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT id FROM searches WHERE LOWER(location_name) = LOWER(?) LIMIT 1",
-        (location_name.strip(),)
-    )
+    cursor.execute("""
+        SELECT s.id FROM searches s
+        JOIN search_results sr ON s.id = sr.search_id
+        WHERE LOWER(s.location_name) = LOWER(?)
+        GROUP BY s.id
+        HAVING COUNT(sr.id) > 0
+        LIMIT 1
+    """, (location_name.strip(),))
     row = cursor.fetchone()
     conn.close()
     return row["id"] if row else None
@@ -264,6 +269,15 @@ def get_analysis(institution_id):
         result = dict(row)
         result["offerings"] = json.loads(result["offerings"]) if result["offerings"] else []
         result["specializations"] = json.loads(result["specializations"]) if result["specializations"] else []
+        # Rating aus raw_response extrahieren (wird von KI-Analyse geliefert)
+        if result.get("raw_response"):
+            try:
+                raw = json.loads(result["raw_response"])
+                result["rating"] = raw.get("rating", "Keine Angabe")
+            except (json.JSONDecodeError, TypeError):
+                result["rating"] = "Keine Angabe"
+        else:
+            result["rating"] = "Keine Angabe"
         return result
     return None
 
@@ -290,7 +304,56 @@ def get_all_analyses(institution_ids):
         r = dict(row)
         r["offerings"] = json.loads(r["offerings"]) if r["offerings"] else []
         r["specializations"] = json.loads(r["specializations"]) if r["specializations"] else []
+        _extract_rating(r)
         results.append(r)
+    conn.close()
+    return results
+
+
+def get_all_analyses_for_institution(institution_id):
+    """Alle Analysen einer Einrichtung laden (fuer Prompt-Vergleich)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM analyses
+        WHERE institution_id = ?
+        ORDER BY created_at DESC
+    """, (institution_id,))
+    results = []
+    for row in cursor.fetchall():
+        r = dict(row)
+        r["offerings"] = json.loads(r["offerings"]) if r["offerings"] else []
+        r["specializations"] = json.loads(r["specializations"]) if r["specializations"] else []
+        _extract_rating(r)
+        results.append(r)
+    conn.close()
+    return results
+
+
+def _extract_rating(analysis_dict):
+    """Rating aus raw_response extrahieren."""
+    if analysis_dict.get("raw_response"):
+        try:
+            raw = json.loads(analysis_dict["raw_response"])
+            analysis_dict["rating"] = raw.get("rating", "Keine Angabe")
+        except (json.JSONDecodeError, TypeError):
+            analysis_dict["rating"] = "Keine Angabe"
+    else:
+        analysis_dict["rating"] = "Keine Angabe"
+
+
+def search_institutions_by_name(query):
+    """Einrichtungen nach Name in der DB suchen."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, name, type, address
+        FROM institutions
+        WHERE name LIKE ?
+        ORDER BY name
+        LIMIT 20
+    """, (f"%{query}%",))
+    results = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return results
 

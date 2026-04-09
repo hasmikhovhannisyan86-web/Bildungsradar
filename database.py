@@ -117,6 +117,16 @@ def save_search(location_name, lat=None, lng=None):
     return search_id
 
 
+def delete_search(search_id):
+    """Suchanfrage loeschen (z.B. bei 0 Ergebnissen)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM search_results WHERE search_id = ?", (search_id,))
+    cursor.execute("DELETE FROM searches WHERE id = ?", (search_id,))
+    conn.commit()
+    conn.close()
+
+
 def get_search(search_id):
     """Suchanfrage nach ID laden."""
     conn = get_db()
@@ -186,6 +196,18 @@ def update_institution(institution_id, data):
             values
         )
         conn.commit()
+    conn.close()
+
+
+def update_institution_rating(institution_id, rating, total_ratings):
+    """Google-Bewertung einer Einrichtung aktualisieren."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE institutions SET rating = ?, total_ratings = ? WHERE id = ?",
+        (rating, total_ratings, institution_id)
+    )
+    conn.commit()
     conn.close()
 
 

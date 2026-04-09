@@ -5,6 +5,55 @@ Optional: Google Places API wenn API-Key vorhanden.
 """
 import requests
 import config
+from difflib import get_close_matches
+
+# Deutsche Staedte fuer Tippfehler-Korrektur
+DEUTSCHE_STAEDTE = [
+    "Berlin", "Hamburg", "München", "Köln", "Frankfurt", "Stuttgart",
+    "Düsseldorf", "Leipzig", "Dortmund", "Essen", "Bremen", "Dresden",
+    "Hannover", "Nürnberg", "Duisburg", "Bochum", "Wuppertal", "Bielefeld",
+    "Bonn", "Münster", "Mannheim", "Karlsruhe", "Augsburg", "Wiesbaden",
+    "Mönchengladbach", "Gelsenkirchen", "Aachen", "Braunschweig", "Chemnitz",
+    "Kiel", "Halle", "Magdeburg", "Freiburg", "Krefeld", "Mainz", "Lübeck",
+    "Erfurt", "Oberhausen", "Rostock", "Kassel", "Hagen", "Potsdam",
+    "Saarbrücken", "Hamm", "Ludwigshafen", "Oldenburg", "Mülheim",
+    "Osnabrück", "Leverkusen", "Heidelberg", "Darmstadt", "Solingen",
+    "Regensburg", "Herne", "Paderborn", "Neuss", "Ingolstadt", "Offenbach",
+    "Würzburg", "Ulm", "Heilbronn", "Pforzheim", "Wolfsburg", "Göttingen",
+    "Bottrop", "Reutlingen", "Koblenz", "Bremerhaven", "Bergisch Gladbach",
+    "Trier", "Jena", "Erlangen", "Moers", "Siegen", "Cottbus", "Hildesheim",
+]
+
+
+def _correct_city_name(location):
+    """Tippfehler in Stadtnamen korrigieren mit Fuzzy-Matching."""
+    location = location.strip()
+    # Exakter Treffer (case-insensitive)?
+    for city in DEUTSCHE_STAEDTE:
+        if city.lower() == location.lower():
+            return city
+    # Ue/Oe/Ae -> Umlaute ersetzen (z.B. "Muenchen" -> "München")
+    normalized = (location
+        .replace("ue", "ü").replace("Ue", "Ü")
+        .replace("oe", "ö").replace("Oe", "Ö")
+        .replace("ae", "ä").replace("Ae", "Ä")
+    )
+    for city in DEUTSCHE_STAEDTE:
+        if city.lower() == normalized.lower():
+            return city
+    # Fuzzy-Matching: naechsten Treffer finden (z.B. "Frankfurr" -> "Frankfurt")
+    lower_cities = [c.lower() for c in DEUTSCHE_STAEDTE]
+    matches = get_close_matches(location.lower(), lower_cities, n=1, cutoff=0.7)
+    if matches:
+        idx = lower_cities.index(matches[0])
+        return DEUTSCHE_STAEDTE[idx]
+    # Auch mit normalisierten Umlauten probieren
+    matches = get_close_matches(normalized.lower(), lower_cities, n=1, cutoff=0.7)
+    if matches:
+        idx = lower_cities.index(matches[0])
+        return DEUTSCHE_STAEDTE[idx]
+    # Kein Match - Original zurueckgeben (Nominatim versucht es trotzdem)
+    return location
 
 
 def search_institutions(location):
@@ -12,17 +61,35 @@ def search_institutions(location):
     Sucht echte Bildungseinrichtungen in der Naehe eines Ortes.
     Nutzt OpenStreetMap (Nominatim + Overpass API) - kostenlos, keine API-Keys noetig.
     """
-    # Schritt 1: Ort in Koordinaten umwandeln (Geocoding)
-    coords = _geocode_location(location)
-    if not coords:
+    # Schritt 1: Zuerst Nominatim fragen (findet echte Orte wie "Messel", "Buxtehude" etc.)
+    geocode_result = _geocode_location(location)
+
+    if not geocode_result:
+        # Nominatim hat nichts gefunden -> Tippfehler-Korrektur versuchen
+        corrected_input = _correct_city_name(location)
+        if corrected_input.lower() != location.lower():
+            print(f"Tippfehler-Korrektur: '{location}' -> '{corrected_input}'")
+            geocode_result = _geocode_location(corrected_input)
+
+    if not geocode_result:
         print(f"Ort '{location}' nicht gefunden.")
         return []
 
-    lat, lng = coords
-    print(f"Ort gefunden: {location} -> {lat}, {lng}")
+    lat, lng, corrected_name = geocode_result
+    if corrected_name.lower() != location.lower():
+        print(f"Korrektur: '{location}' -> '{corrected_name}'")
+    print(f"Ort gefunden: {corrected_name} -> {lat}, {lng}")
 
-    # Schritt 2: Einrichtungen in der Naehe suchen via Overpass API (EINE Anfrage fuer alles)
-    all_results = _search_overpass_combined(lat, lng)
+    # Schritt 2: Zuerst schnelle Area-Suche, Fallback auf Umkreissuche
+    all_results = _search_overpass_by_area(corrected_name)
+    if not all_results:
+        print(f"Area-Suche leer, versuche Umkreissuche...")
+        all_results = _search_overpass_combined(lat, lng)
+    elif len(all_results) < 20:
+        # Kleine Orte: zusaetzlich Umkreissuche um Nachbarorte einzubeziehen
+        print(f"Wenige Ergebnisse ({len(all_results)}), ergaenze mit Umkreissuche...")
+        around_results = _search_overpass_combined(lat, lng)
+        all_results.extend(around_results)
 
     # Duplikate entfernen (gleiche OSM-ID)
     seen_ids = set()
@@ -101,13 +168,17 @@ def search_institutions(location):
 
 
 def _geocode_location(location):
-    """Ort in Koordinaten umwandeln mit Nominatim (OpenStreetMap)."""
+    """Ort in Koordinaten umwandeln mit Nominatim (OpenStreetMap).
+    Gibt (lat, lng, korrigierter_name) zurueck.
+    Nominatim korrigiert automatisch Tippfehler und Gross-/Kleinschreibung.
+    """
     url = "https://nominatim.openstreetmap.org/search"
     params = {
         "q": location,
         "format": "json",
         "limit": 1,
         "countrycodes": "de",
+        "addressdetails": 1,
     }
     headers = {"User-Agent": "BildungsRadar/1.0 (Schulprojekt)"}
 
@@ -115,24 +186,171 @@ def _geocode_location(location):
         response = requests.get(url, params=params, headers=headers, timeout=10)
         data = response.json()
         if data:
-            return float(data[0]["lat"]), float(data[0]["lon"])
+            result = data[0]
+            lat = float(result["lat"])
+            lng = float(result["lon"])
+            # Korrekten Stadtnamen aus Nominatim-Antwort extrahieren
+            address = result.get("address", {})
+            corrected_name = (
+                address.get("city")
+                or address.get("town")
+                or address.get("village")
+                or address.get("municipality")
+                or result.get("name", location)
+            )
+            return lat, lng, corrected_name
         return None
     except Exception as e:
         print(f"Geocoding Fehler: {e}")
         return None
 
 
+OVERPASS_SERVERS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
+
+
+def _search_overpass_by_area(location):
+    """
+    Schnelle Overpass-Suche nach Stadtname (area-basiert).
+    Viel schneller als around-Suche fuer grosse Staedte wie Muenchen, Berlin, Hamburg.
+    Versucht mehrere admin_levels (6, 8, 7) und alternative Server.
+    """
+    import time
+
+    # Verschiedene admin_levels probieren:
+    # 6 = kreisfreie Staedte (Berlin, Hamburg, Muenchen, Koeln, Frankfurt...)
+    # 8 = Gemeinden (kleinere Staedte und Doerfer)
+    # 7 = Verwaltungsgemeinschaften
+    for admin_level in ["6", "8", "7"]:
+        query = f"""
+        [out:json][timeout:60];
+        area["name"="{location}"]["boundary"="administrative"]["admin_level"="{admin_level}"]->.searchArea;
+        (
+          node["amenity"="kindergarten"](area.searchArea);
+          way["amenity"="kindergarten"](area.searchArea);
+          relation["amenity"="kindergarten"](area.searchArea);
+          node["amenity"="school"](area.searchArea);
+          way["amenity"="school"](area.searchArea);
+          relation["amenity"="school"](area.searchArea);
+        );
+        out center body;
+        """
+
+        for server_url in OVERPASS_SERVERS:
+            try:
+                server_name = "kumi" if "kumi" in server_url else "main"
+                print(f"Area-Suche fuer '{location}' (level={admin_level}, server={server_name})...")
+                response = requests.post(server_url, data={"data": query}, timeout=65)
+
+                if response.status_code in (429, 503, 504):
+                    wait = 3
+                    print(f"Overpass API ueberlastet (HTTP {response.status_code}), versuche anderen Server...")
+                    time.sleep(wait)
+                    continue
+
+                if response.status_code != 200:
+                    print(f"Area-Suche HTTP-Fehler: {response.status_code}")
+                    continue
+
+                data = response.json()
+                results = _parse_overpass_results(data)
+
+                if results:
+                    print(f"Area-Suche (level={admin_level}): {len(results)} Einrichtungen gefunden")
+                    return results
+                else:
+                    print(f"Area-Suche (level={admin_level}): 0 Ergebnisse, versuche naechstes Level...")
+                    break  # Naechstes admin_level, nicht naechster Server
+
+            except requests.exceptions.Timeout:
+                print(f"Area-Suche Timeout (level={admin_level}, server={server_name})")
+                time.sleep(2)
+                continue
+            except Exception as e:
+                print(f"Area-Suche Fehler (level={admin_level}): {e}")
+                continue
+
+    print("Area-Suche: Kein admin_level hat funktioniert")
+    return []
+
+
+def _parse_overpass_results(data):
+    """Overpass JSON-Daten in Einrichtungsliste umwandeln."""
+    results = []
+    for element in data.get("elements", []):
+        tags = element.get("tags", {})
+        name = tags.get("name", "")
+
+        if not name:
+            continue
+
+        # Koordinaten (bei Ways das Center nehmen)
+        if element["type"] == "node":
+            e_lat = element.get("lat", 0)
+            e_lng = element.get("lon", 0)
+        else:
+            center = element.get("center", {})
+            e_lat = center.get("lat", 0)
+            e_lng = center.get("lon", 0)
+
+        # OSM amenity-Tag bestimmt den Basistyp
+        amenity = tags.get("amenity", "")
+        if amenity == "kindergarten":
+            inst_type = "kindergarten"
+        else:
+            inst_type = "schule"
+
+        # Adresse zusammenbauen
+        street = tags.get("addr:street", "")
+        housenumber = tags.get("addr:housenumber", "")
+        city = tags.get("addr:city", tags.get("addr:suburb", ""))
+        postcode = tags.get("addr:postcode", "")
+
+        address_parts = []
+        if street:
+            addr = street
+            if housenumber:
+                addr += " " + housenumber
+            address_parts.append(addr)
+        if postcode or city:
+            address_parts.append(f"{postcode} {city}".strip())
+        address = ", ".join(address_parts) if address_parts else "Adresse nicht verfuegbar"
+
+        # Webseite und Telefon aus OSM-Daten
+        website = tags.get("website", tags.get("contact:website", ""))
+        phone = tags.get("phone", tags.get("contact:phone", ""))
+
+        osm_type = element.get("type", "node")
+        osm_id = element.get("id", 0)
+
+        results.append({
+            "name": name,
+            "type": inst_type,
+            "address": address,
+            "lat": e_lat,
+            "lng": e_lng,
+            "website": website,
+            "phone": phone,
+            "rating": 0,
+            "total_ratings": 0,
+            "place_id": f"osm_{osm_type}_{osm_id}",
+            "_tags": tags,
+        })
+
+    return results
+
+
 def _search_overpass_combined(lat, lng):
     """
-    Alle Bildungseinrichtungen in EINER einzigen Overpass-Anfrage suchen.
-    Verhindert Rate-Limiting (429-Fehler).
+    Fallback: Umkreissuche wenn Area-Suche fehlschlaegt.
     """
     import time
     radius = 10000  # 10 km Umkreis
 
-    # EINE Abfrage fuer Kindergaerten UND Schulen gleichzeitig
     query = f"""
-    [out:json][timeout:25];
+    [out:json][timeout:60];
     (
       node["amenity"="kindergarten"](around:{radius},{lat},{lng});
       way["amenity"="kindergarten"](around:{radius},{lat},{lng});
@@ -144,91 +362,32 @@ def _search_overpass_combined(lat, lng):
     out center body;
     """
 
-    url = "https://overpass-api.de/api/interpreter"
-
-    # Bis zu 3 Versuche mit Wartezeit bei Rate-Limiting
     for attempt in range(3):
+        server_url = OVERPASS_SERVERS[attempt % len(OVERPASS_SERVERS)]
+        server_name = "kumi" if "kumi" in server_url else "main"
         try:
-            response = requests.post(url, data={"data": query}, timeout=25)
+            print(f"Umkreissuche (Versuch {attempt+1}, server={server_name})...")
+            response = requests.post(server_url, data={"data": query}, timeout=65)
 
-            # HTTP-Status pruefen
-            if response.status_code == 429 or response.status_code == 503:
-                wait = 2 * (attempt + 1)
+            if response.status_code in (429, 503, 504):
+                wait = 3 * (attempt + 1)
                 print(f"Overpass API ueberlastet (HTTP {response.status_code}), warte {wait}s...")
                 time.sleep(wait)
                 continue
 
             if response.status_code != 200:
                 print(f"Overpass API HTTP-Fehler: {response.status_code}")
-                return []
+                continue
 
             data = response.json()
-
-            results = []
-            for element in data.get("elements", []):
-                tags = element.get("tags", {})
-                name = tags.get("name", "")
-
-                if not name:
-                    continue
-
-                # Koordinaten (bei Ways das Center nehmen)
-                if element["type"] == "node":
-                    e_lat = element.get("lat", lat)
-                    e_lng = element.get("lon", lng)
-                else:
-                    center = element.get("center", {})
-                    e_lat = center.get("lat", lat)
-                    e_lng = center.get("lon", lng)
-
-                # OSM amenity-Tag bestimmt den Basistyp
-                amenity = tags.get("amenity", "")
-                if amenity == "kindergarten":
-                    inst_type = "kindergarten"
-                else:
-                    inst_type = "schule"
-
-                # Adresse zusammenbauen
-                street = tags.get("addr:street", "")
-                housenumber = tags.get("addr:housenumber", "")
-                city = tags.get("addr:city", tags.get("addr:suburb", ""))
-                postcode = tags.get("addr:postcode", "")
-
-                address_parts = []
-                if street:
-                    addr = street
-                    if housenumber:
-                        addr += " " + housenumber
-                    address_parts.append(addr)
-                if postcode or city:
-                    address_parts.append(f"{postcode} {city}".strip())
-                address = ", ".join(address_parts) if address_parts else "Adresse nicht verfuegbar"
-
-                # Webseite und Telefon aus OSM-Daten
-                website = tags.get("website", tags.get("contact:website", ""))
-                phone = tags.get("phone", tags.get("contact:phone", ""))
-
-                results.append({
-                    "place_id": f"osm_{element['type']}_{element['id']}",
-                    "name": name,
-                    "type": inst_type,
-                    "address": address,
-                    "lat": e_lat,
-                    "lng": e_lng,
-                    "rating": 0,
-                    "total_ratings": 0,
-                    "website": website,
-                    "phone": phone,
-                    "_tags": tags,
-                })
-
-            print(f"Overpass API: {len(results)} Einrichtungen gefunden")
+            results = _parse_overpass_results(data)
+            print(f"Umkreissuche: {len(results)} Einrichtungen gefunden")
             return results
 
         except Exception as e:
             print(f"Overpass API Fehler (Versuch {attempt+1}): {e}")
             if attempt < 2:
-                time.sleep(2)
+                time.sleep(3)
 
     print("Overpass API: Alle Versuche fehlgeschlagen")
     return []

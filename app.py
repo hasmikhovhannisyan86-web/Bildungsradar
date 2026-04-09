@@ -28,6 +28,19 @@ def search():
     if not location:
         return redirect(url_for("index"))
 
+    # Ortsname korrigieren: Zuerst Nominatim fragen, dann Fuzzy-Korrektur
+    from google_maps_service import _correct_city_name, _geocode_location
+    geocode_result = _geocode_location(location)
+    if geocode_result:
+        # Nominatim hat den Ort gefunden -> korrekten Namen verwenden
+        _, _, corrected_location = geocode_result
+    else:
+        # Nominatim findet nichts -> Tippfehler-Korrektur versuchen
+        corrected_location = _correct_city_name(location)
+    if corrected_location.lower() != location.lower():
+        print(f"Eingabe korrigiert: '{location}' -> '{corrected_location}'")
+    location = corrected_location
+
     # Pruefen ob Ergebnisse bereits in der Datenbank gespeichert sind (Caching)
     cached_search_id = database.find_cached_search(location)
 
@@ -49,7 +62,12 @@ def search():
             if inst_id:
                 database.link_search_result(search_id, inst_id)
 
-        print(f"Neue Suche fuer '{location}': {len(results)} Ergebnisse gespeichert")
+        # Bei 0 Ergebnissen den Cache loeschen damit naechstes Mal erneut gesucht wird
+        if not results:
+            database.delete_search(search_id)
+            print(f"WARNUNG: 0 Ergebnisse fuer '{location}' - Cache nicht gespeichert")
+        else:
+            print(f"Neue Suche fuer '{location}': {len(results)} Ergebnisse gespeichert")
 
     # Ergebnisse aus DB laden (sortiert nach Bewertung)
     institutions = database.get_search_results(search_id)
@@ -131,6 +149,12 @@ def compare():
     )
 
 
+@app.route("/chat")
+def chat():
+    """Elternberatung - Chatbot fuer Schulberatung."""
+    return render_template("chat.html")
+
+
 # --- API-Endpunkte ---
 
 @app.route("/api/analyze/<int:institution_id>", methods=["POST"])
@@ -204,6 +228,64 @@ def api_search_institutions():
         return jsonify([])
     results = database.search_institutions_by_name(query)
     return jsonify(results)
+
+
+@app.route("/api/fetch-ratings/<int:search_id>", methods=["POST"])
+def fetch_ratings(search_id):
+    """Bewertungen fuer Einrichtungen einer Suche nachladen.
+    Nutzt Google-Scraping + OpenAI - kein Google API Key noetig!
+    Optional: filter=privatschule um nur bestimmte Typen zu laden."""
+    search_data = database.get_search(search_id)
+    if not search_data:
+        return jsonify({"error": "Suche nicht gefunden"}), 404
+
+    data = request.get_json(silent=True) or {}
+    type_filter = data.get("filter", "")
+    max_count = data.get("max", 50)  # Maximal 50 auf einmal
+
+    institutions = database.get_search_results(search_id)
+    city = search_data.get("location_name", "")
+
+    # Optional nach Typ filtern
+    if type_filter:
+        institutions = [i for i in institutions if i.get("type") == type_filter]
+
+    # Nur Einrichtungen ohne Bewertung, limitiert
+    to_fetch = [i for i in institutions if not (i.get("rating", 0) > 0 and i.get("total_ratings", 0) > 0)]
+    to_fetch = to_fetch[:max_count]
+
+    from ratings_service import fetch_ratings_batch
+    results = fetch_ratings_batch(to_fetch, city)
+
+    updated = 0
+    for inst_id, rating_data in results.items():
+        if rating_data and rating_data["rating"] > 0:
+            database.update_institution_rating(
+                inst_id, rating_data["rating"], rating_data["total_ratings"]
+            )
+            updated += 1
+
+    return jsonify({
+        "success": True,
+        "updated": updated,
+        "total": len(to_fetch),
+        "message": f"{updated} von {len(to_fetch)} Bewertungen geladen"
+    })
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    """Chat-API: Elternberatung mit OpenAI."""
+    data = request.get_json()
+    if not data or not data.get("message"):
+        return jsonify({"error": "Keine Nachricht gesendet"}), 400
+
+    user_message = data["message"]
+    history = data.get("history", [])
+
+    from chat_service import get_chat_response
+    result = get_chat_response(user_message, history)
+    return jsonify(result)
 
 
 @app.route("/api/favorite/<int:institution_id>", methods=["POST"])

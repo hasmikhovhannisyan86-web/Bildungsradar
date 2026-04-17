@@ -112,6 +112,44 @@ function openCompare() {
 }
 
 
+// --- Google Bewertungen laden ---
+function loadGoogleRatings(searchId, typeFilter) {
+    var buttons = document.querySelectorAll(".btn-ratings");
+    var status = document.getElementById("rating-status");
+
+    buttons.forEach(function(b) { b.disabled = true; });
+    status.textContent = "Lade Bewertungen... Bitte warten...";
+    status.style.color = "#3498db";
+
+    fetch("/api/fetch-ratings/" + searchId, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({filter: typeFilter, max: 50})
+    })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (data.success) {
+                status.textContent = data.message;
+                status.style.color = "#27ae60";
+                // Seite nach 2 Sekunden neu laden um Sterne anzuzeigen
+                setTimeout(function() {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                status.textContent = data.error || "Fehler beim Laden der Bewertungen";
+                status.style.color = "#e74c3c";
+                buttons.forEach(function(b) { b.disabled = false; });
+            }
+        })
+        .catch(function (error) {
+            console.error("Rating-Fehler:", error);
+            status.textContent = "Fehler: " + error.message;
+            status.style.color = "#e74c3c";
+            buttons.forEach(function(b) { b.disabled = false; });
+        });
+}
+
+
 // --- Favoriten-Funktion ---
 function toggleFavorite(institutionId, button) {
     fetch("/api/favorite/" + institutionId, { method: "POST" })

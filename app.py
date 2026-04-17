@@ -24,12 +24,18 @@ def index():
 @app.route("/search")
 def search():
     """Suche ausfuehren und Ergebnisse anzeigen."""
-    location = request.args.get("location", "").strip()
-    if not location:
+    raw_query = request.args.get("location", "").strip()
+    if not raw_query:
         return redirect(url_for("index"))
 
+    # Natuerliche Anfrage parsen: "Ich suche Kindergarten in Marl"
+    # -> location="Marl", type_filter="kindergarten"
+    from google_maps_service import parse_search_query, _correct_city_name, _geocode_location
+    location, type_filter = parse_search_query(raw_query)
+    if type_filter:
+        print(f"Typ-Filter erkannt: {type_filter}")
+
     # Ortsname korrigieren: Zuerst Nominatim fragen, dann Fuzzy-Korrektur
-    from google_maps_service import _correct_city_name, _geocode_location
     geocode_result = _geocode_location(location)
     if geocode_result:
         # Nominatim hat den Ort gefunden -> korrekten Namen verwenden
@@ -90,7 +96,8 @@ def search():
         institutions=institutions,
         search_id=search_id,
         counts=counts,
-        cached=cached_search_id is not None
+        cached=cached_search_id is not None,
+        active_filter=type_filter or "all"
     )
 
 

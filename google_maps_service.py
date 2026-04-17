@@ -25,6 +25,90 @@ DEUTSCHE_STAEDTE = [
 ]
 
 
+def parse_search_query(query):
+    """
+    Parst eine natuerliche Suchanfrage und extrahiert Ort und Typ.
+    Beispiele:
+      "Ich suche Kindergarten in Marl" -> ("Marl", "kindergarten")
+      "Kindergarten in Marl"           -> ("Marl", "kindergarten")
+      "Schulen bei Frankfurt"          -> ("Frankfurt", "schule")
+      "Privatschule Darmstadt"         -> ("Darmstadt", "privatschule")
+      "Marl"                           -> ("Marl", None)
+    Gibt (location, type_filter) zurueck. type_filter ist None oder
+    einer von: "kindergarten", "kita", "schule", "privatschule".
+    """
+    import re
+    query = query.strip()
+    query_lower = query.lower()
+
+    # Typ-Schluesselwoerter erkennen
+    type_filter = None
+    type_keywords = [
+        ("privatschule", "privatschule"),
+        ("privatschulen", "privatschule"),
+        ("privat-schule", "privatschule"),
+        ("private schule", "privatschule"),
+        ("private schulen", "privatschule"),
+        ("kindergarten", "kindergarten"),
+        ("kindergarten", "kindergarten"),
+        ("kindergaerten", "kindergarten"),
+        ("kindergärten", "kindergarten"),
+        ("kita", "kita"),
+        ("kitas", "kita"),
+        ("kinderkrippe", "kita"),
+        ("krippe", "kita"),
+        ("gymnasium", "schule"),
+        ("grundschule", "schule"),
+        ("realschule", "schule"),
+        ("gesamtschule", "schule"),
+        ("hauptschule", "schule"),
+        ("schulen", "schule"),
+        ("schule", "schule"),
+    ]
+    for keyword, type_name in type_keywords:
+        if re.search(r'\b' + re.escape(keyword) + r'\b', query_lower):
+            type_filter = type_name
+            break
+
+    # Ortsname extrahieren: Pattern "in/bei/fuer/um <Ort>"
+    location = None
+    patterns = [
+        r'\b(?:in|bei|fuer|für|um|nahe|nahebei|nach)\s+([A-ZÄÖÜ][a-zäöüß\-]+(?:\s+[A-ZÄÖÜ][a-zäöüß\-]+)?)',
+        r'\b(?:in|bei|fuer|für|um|nahe)\s+(\w+)',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, query, re.IGNORECASE)
+        if match:
+            location = match.group(1).strip()
+            break
+
+    # Wenn kein Ort gefunden: Fuell-/Typ-Woerter entfernen, Rest als Ort nehmen
+    if not location:
+        fuellwoerter = [
+            "ich", "suche", "finde", "moechte", "möchte", "will", "einen",
+            "eine", "ein", "nach", "den", "die", "das", "wo", "ist", "sind",
+            "gibt", "es", "welche", "welcher", "welches", "der", "mir", "bitte",
+            "nicht",
+        ]
+        # Entferne Fuellwoerter und Typ-Keywords
+        words = re.findall(r'\b[\wäöüÄÖÜß\-]+\b', query)
+        remaining = []
+        for w in words:
+            wl = w.lower()
+            if wl in fuellwoerter:
+                continue
+            if any(wl == kw for kw, _ in type_keywords):
+                continue
+            remaining.append(w)
+        if remaining:
+            location = " ".join(remaining)
+
+    if not location:
+        location = query  # Fallback: komplette Anfrage
+
+    return location.strip(), type_filter
+
+
 def _correct_city_name(location):
     """Tippfehler in Stadtnamen korrigieren mit Fuzzy-Matching."""
     location = location.strip()

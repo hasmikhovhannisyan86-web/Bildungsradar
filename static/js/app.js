@@ -8,6 +8,17 @@
 document.addEventListener("DOMContentLoaded", function () {
     var filterButtons = document.querySelectorAll(".filter-btn");
 
+    function applyFilter(filterType) {
+        var cards = document.querySelectorAll(".institution-card");
+        cards.forEach(function (card) {
+            if (filterType === "all" || card.getAttribute("data-type") === filterType) {
+                card.classList.remove("hidden");
+            } else {
+                card.classList.add("hidden");
+            }
+        });
+    }
+
     filterButtons.forEach(function (btn) {
         btn.addEventListener("click", function () {
             var filterType = this.getAttribute("data-filter");
@@ -16,17 +27,15 @@ document.addEventListener("DOMContentLoaded", function () {
             filterButtons.forEach(function (b) { b.classList.remove("active"); });
             this.classList.add("active");
 
-            // Karten filtern
-            var cards = document.querySelectorAll(".institution-card");
-            cards.forEach(function (card) {
-                if (filterType === "all" || card.getAttribute("data-type") === filterType) {
-                    card.classList.remove("hidden");
-                } else {
-                    card.classList.add("hidden");
-                }
-            });
+            applyFilter(filterType);
         });
     });
+
+    // Beim Laden: den aktuell aktiven Filter anwenden (fuer serverseitig gesetzten Filter)
+    var activeBtn = document.querySelector(".filter-btn.active");
+    if (activeBtn) {
+        applyFilter(activeBtn.getAttribute("data-filter"));
+    }
 });
 
 

@@ -10,21 +10,32 @@
         {% if cached %}<span class="cache-badge">aus Datenbank geladen</span>{% endif %}
     </p>
 
+    <!-- Google Bewertungen laden -->
+    <div class="rating-actions" style="margin-bottom: 15px;">
+        <button class="btn-ratings" id="btn-load-ratings" onclick="loadGoogleRatings({{ search_id }}, '')">
+            ⭐ Bewertungen laden (Top 50)
+        </button>
+        <button class="btn-ratings" style="background: linear-gradient(135deg, #fd79a8, #e84393);" onclick="loadGoogleRatings({{ search_id }}, 'privatschule')">
+            ⭐ Privatschulen Bewertungen
+        </button>
+        <span id="rating-status" style="margin-left: 10px; color: #666;"></span>
+    </div>
+
     <!-- Filter-Toggles mit Zaehler -->
     <div class="filter-bar">
-        <button class="filter-btn active" data-filter="all">
+        <button class="filter-btn {% if active_filter == 'all' %}active{% endif %}" data-filter="all">
             Alle <span class="badge">{{ institutions|length }}</span>
         </button>
-        <button class="filter-btn" data-filter="kindergarten">
+        <button class="filter-btn {% if active_filter == 'kindergarten' %}active{% endif %}" data-filter="kindergarten">
             &#127979; Kindergaerten <span class="badge">{{ counts.kindergarten }}</span>
         </button>
-        <button class="filter-btn" data-filter="kita">
+        <button class="filter-btn {% if active_filter == 'kita' %}active{% endif %}" data-filter="kita">
             &#128118; Kitas <span class="badge">{{ counts.kita }}</span>
         </button>
-        <button class="filter-btn" data-filter="schule">
+        <button class="filter-btn {% if active_filter == 'schule' %}active{% endif %}" data-filter="schule">
             &#127891; Schulen <span class="badge">{{ counts.schule }}</span>
         </button>
-        <button class="filter-btn" data-filter="privatschule">
+        <button class="filter-btn {% if active_filter == 'privatschule' %}active{% endif %}" data-filter="privatschule">
             &#11088; Privatschulen <span class="badge">{{ counts.privatschule }}</span>
         </button>
     </div>
@@ -64,6 +75,30 @@
             </div>
 
             <div class="card-body">
+                {% if inst.rating and inst.rating > 0 %}
+                <div class="google-rating" id="rating-{{ inst.id }}">
+                    <span class="stars">
+                        {% for i in range(1, 6) %}
+                            {% if i <= inst.rating|round(0, 'floor')|int %}
+                                <span class="star filled">★</span>
+                            {% elif i - 0.5 <= inst.rating %}
+                                <span class="star half">★</span>
+                            {% else %}
+                                <span class="star empty">☆</span>
+                            {% endif %}
+                        {% endfor %}
+                    </span>
+                    <span class="rating-number">{{ "%.1f"|format(inst.rating) }}</span>
+                    {% if inst.total_ratings > 0 %}
+                    <span class="rating-count">({{ inst.total_ratings }} Bewertungen)</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="google-rating no-rating" id="rating-{{ inst.id }}">
+                    <span class="stars-empty">☆☆☆☆☆</span>
+                    <span class="rating-count">Noch keine Bewertung</span>
+                </div>
+                {% endif %}
                 <p class="address">&#128205; {{ inst.address }}</p>
                 {% if inst.phone %}
                 <p class="phone">&#128222; {{ inst.phone }}</p>

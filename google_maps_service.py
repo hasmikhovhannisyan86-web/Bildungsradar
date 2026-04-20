@@ -70,17 +70,45 @@ def parse_search_query(query):
             type_filter = type_name
             break
 
-    # Ortsname extrahieren: Pattern "in/bei/fuer/um <Ort>"
+    # Stop-Woerter: Verben und Fuellwoerter, die NICHT Teil eines Ortsnamens sind.
+    # Werden nach dem erfassten Ort abgeschnitten (z.B. "Hamburg finden" -> "Hamburg").
+    stop_words = {
+        "finden", "finde", "suchen", "suche", "zeigen", "zeige", "gibt", "gib",
+        "sehen", "siehe", "bitte", "mir", "uns", "brauche", "brauchen",
+        "moechte", "möchte", "moechten", "möchten", "will", "wollen",
+        "waere", "wäre", "gut", "besser", "schoen", "schön", "nah", "nahe",
+        "weit", "entfernt", "in", "bei", "fuer", "für", "um", "nach",
+        "und", "oder", "aber", "auch", "noch", "schon", "nur", "sehr",
+    }
+
+    # Ortsname extrahieren: Pattern "in/bei/fuer/um <Ort>" (case-sensitive Grossschreibung!)
     location = None
-    patterns = [
-        r'\b(?:in|bei|fuer|für|um|nahe|nahebei|nach)\s+([A-ZÄÖÜ][a-zäöüß\-]+(?:\s+[A-ZÄÖÜ][a-zäöüß\-]+)?)',
-        r'\b(?:in|bei|fuer|für|um|nahe)\s+(\w+)',
+    patterns_cs = [
+        # Zwei-Wort-Ort (z.B. "in Frankfurt am Main" -> "Frankfurt am Main")
+        r'\b(?:in|bei|fuer|für|um|nahe|nahebei|nach)\s+([A-ZÄÖÜ][a-zäöüß\-]+(?:\s+(?:am|an|im|in|auf|bei|ob|unter|vor)\s+[A-ZÄÖÜ][a-zäöüß\-]+)?)',
+        # Einfacher Ein-Wort-Ort (z.B. "in Hamburg" -> "Hamburg")
+        r'\b(?:in|bei|fuer|für|um|nahe|nahebei|nach)\s+([A-ZÄÖÜ][a-zäöüß\-]+)',
     ]
-    for pattern in patterns:
-        match = re.search(pattern, query, re.IGNORECASE)
+    for pattern in patterns_cs:
+        match = re.search(pattern, query)  # case-sensitive!
         if match:
             location = match.group(1).strip()
             break
+
+    # Fallback case-insensitive: falls Nutzer alles klein schreibt
+    if not location:
+        pattern_ci = r'\b(?:in|bei|fuer|für|um|nahe|nahebei|nach)\s+(\w+)'
+        match = re.search(pattern_ci, query, re.IGNORECASE)
+        if match:
+            location = match.group(1).strip()
+
+    # Stop-Woerter am Ende des erfassten Ortes abschneiden
+    # (z.B. "Hamburg finden" -> "Hamburg")
+    if location:
+        parts = location.split()
+        while parts and parts[-1].lower() in stop_words:
+            parts.pop()
+        location = " ".join(parts) if parts else None
 
     # Wenn kein Ort gefunden: Fuell-/Typ-Woerter entfernen, Rest als Ort nehmen
     if not location:

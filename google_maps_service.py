@@ -72,6 +72,15 @@ def search_institutions(location):
         # Tags nicht mehr noetig, entfernen
         inst.pop("_tags", None)
 
+    # Schritt 3: Bewertungen von Google Places API nachladen (wenn API-Key vorhanden)
+    if config.GOOGLE_MAPS_API_KEY and not config.DEMO_MODE:
+        print("Lade Bewertungen von Google Places API...")
+        for inst in unique_results:
+            rating_data = _get_google_rating(inst["name"], lat, lng)
+            if rating_data:
+                inst["rating"] = rating_data["rating"]
+                inst["total_ratings"] = rating_data["total_ratings"]
+
     print(f"{len(unique_results)} Einrichtungen gefunden fuer '{location}'")
     return unique_results
 
@@ -103,14 +112,15 @@ def _search_overpass(lat, lng, amenity_type, inst_type):
     Echte Einrichtungen ueber die Overpass API (OpenStreetMap) suchen.
     Sucht im Umkreis von 5km.
     """
-    radius = 5000  # 5 km Umkreis
+    radius = 10000  # 10 km Umkreis (um auch seltenere Schulen wie Waldorf zu finden)
 
-    # Overpass QL Abfrage: Suche Knoten und Flaechen mit amenity-Tag
+    # Overpass QL Abfrage: Suche Knoten, Flaechen UND Relationen mit amenity-Tag
     query = f"""
     [out:json][timeout:15];
     (
       node["amenity"="{amenity_type}"](around:{radius},{lat},{lng});
       way["amenity"="{amenity_type}"](around:{radius},{lat},{lng});
+      relation["amenity"="{amenity_type}"](around:{radius},{lat},{lng});
     );
     out center body;
     """
@@ -178,3 +188,34 @@ def _search_overpass(lat, lng, amenity_type, inst_type):
     except Exception as e:
         print(f"Overpass API Fehler: {e}")
         return []
+
+
+def _get_google_rating(name, lat, lng):
+    """
+    Bewertung einer Einrichtung ueber Google Places API (Text Search) laden.
+    Gibt rating und total_ratings zurueck oder None.
+    """
+    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    params = {
+        "query": name,
+        "location": f"{lat},{lng}",
+        "radius": 5000,
+        "language": "de",
+        "key": config.GOOGLE_MAPS_API_KEY,
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+
+        if data.get("status") == "OK" and data.get("results"):
+            place = data["results"][0]
+            return {
+                "rating": place.get("rating", 0),
+                "total_ratings": place.get("user_ratings_total", 0),
+            }
+        return None
+
+    except Exception as e:
+        print(f"Google Places Fehler fuer '{name}': {e}")
+        return None

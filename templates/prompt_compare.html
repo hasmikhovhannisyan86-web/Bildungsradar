@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Prompt-Vergleich | BildungsRadar{% endblock %}
+
+{% block content %}
+<div class="prompt-compare-page">
+    <h2>Prompt- &amp; Temperature-Vergleich</h2>
+    <p class="subtitle">Teste verschiedene Prompt-Varianten und Temperature-Werte fuer die KI-Analyse.</p>
+
+    <!-- Einrichtung auswaehlen -->
+    <div class="experiment-setup">
+        <form method="GET" action="/prompt-compare" class="experiment-form">
+            <label for="institution_id"><strong>Einrichtungs-ID:</strong></label>
+            <input type="number" name="institution_id" id="institution_id"
+                   value="{{ institution.id if institution else '' }}"
+                   placeholder="z.B. 1" min="1">
+            <button type="submit" class="btn-analyze">Laden</button>
+        </form>
+    </div>
+
+    {% if institution %}
+    <div class="experiment-target">
+        <h3>{{ institution.name }}</h3>
+        <p class="address">{{ institution.address }}</p>
+        {% if institution.website %}
+        <p class="website"><a href="{{ institution.website }}" target="_blank">{{ institution.website }}</a></p>
+        {% endif %}
+    </div>
+
+    <!-- Neue Analyse starten -->
+    <div class="experiment-controls">
+        <h3>Neue Analyse starten</h3>
+        <div class="controls-row">
+            <div class="control-group">
+                <label for="prompt-select"><strong>Prompt-Version:</strong></label>
+                <select id="prompt-select">
+                    {% for key, version in versions.items() %}
+                    <option value="{{ key }}">{{ key }} - {{ version.name }}: {{ version.description }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="temp-select"><strong>Temperature:</strong></label>
+                <select id="temp-select">
+                    {% for temp in temperatures %}
+                    <option value="{{ temp }}" {% if temp == 0.3 %}selected{% endif %}>{{ temp }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button class="btn-analyze" onclick="runExperiment({{ institution.id }})">
+                Analyse starten
+            </button>
+        </div>
+        <div class="temp-info">
+            <small>
+                <strong>Temperature-Erklaerung:</strong>
+                0.1 = sehr deterministisch (immer aehnlich) |
+                0.3 = ausgewogen |
+                0.7 = kreativ |
+                1.0 = sehr kreativ (mehr Varianz)
+            </small>
+        </div>
+    </div>
+
+    <!-- Ergebnis-Tabelle -->
+    <div class="experiment-results">
+        <h3>Bisherige Analysen ({{ analyses|length }})</h3>
+        {% if analyses %}
+        <div class="compare-table-wrapper">
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>Kriterium</th>
+                        {% for a in analyses %}
+                        <th>
+                            <span class="prompt-badge">{{ a.prompt_version }}</span>
+                            T={{ a.temperature }}
+                            <br><small>{{ a.created_at }}</small>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Zusammenfassung</strong></td>
+                        {% for a in analyses %}
+                        <td>{{ a.summary or 'Keine Angabe' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Preise</strong></td>
+                        {% for a in analyses %}
+                        <td>{{ a.prices or 'Keine Angabe' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Angebote</strong></td>
+                        {% for a in analyses %}
+                        <td>
+                            {% if a.offerings %}
+                            <ul class="compare-list">
+                                {% for o in a.offerings %}
+                                <li>{{ o }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}Keine Angabe{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Spezialisierungen</strong></td>
+                        {% for a in analyses %}
+                        <td>
+                            {% if a.specializations %}
+                            <ul class="compare-list">
+                                {% for s in a.specializations %}
+                                <li>{{ s }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}Keine Angabe{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Altersgruppen</strong></td>
+                        {% for a in analyses %}
+                        <td>{{ a.age_groups or 'Keine Angabe' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Modell</strong></td>
+                        {% for a in analyses %}
+                        <td><code>{{ a.model_used }}</code></td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="no-results">Noch keine Analysen vorhanden. Starte oben eine neue Analyse!</p>
+        {% endif %}
+    </div>
+    {% elif request.args.get('institution_id') %}
+    <p class="no-results">Einrichtung nicht gefunden. Pruefe die ID.</p>
+    {% else %}
+    <p class="no-results">Gib eine Einrichtungs-ID ein, um den Vergleich zu starten.<br>
+    Tipp: Suche zuerst auf der <a href="/">Startseite</a> nach Einrichtungen.</p>
+    {% endif %}
+</div>
+
+<div id="experiment-status" style="display:none;" class="experiment-status">
+    Analyse laeuft...
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function runExperiment(institutionId) {
+    var promptVersion = document.getElementById("prompt-select").value;
+    var temperature = parseFloat(document.getElementById("temp-select").value);
+
+    var status = document.getElementById("experiment-status");
+    status.style.display = "block";
+    status.textContent = "Analyse laeuft mit " + promptVersion + " (T=" + temperature + ")...";
+
+    fetch("/api/analyze/" + institutionId, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            prompt_version: promptVersion,
+            temperature: temperature
+        })
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        if (data.success) {
+            status.textContent = "Analyse abgeschlossen! Seite wird neu geladen...";
+            setTimeout(function() { location.reload(); }, 500);
+        } else {
+            status.textContent = "Fehler bei der Analyse.";
+        }
+    })
+    .catch(function(error) {
+        console.error("Experiment-Fehler:", error);
+        status.textContent = "Fehler: " + error.message;
+    });
+}
+</script>
+{% endblock %}

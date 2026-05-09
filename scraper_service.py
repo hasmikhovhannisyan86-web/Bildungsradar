@@ -7,13 +7,20 @@ from bs4 import BeautifulSoup
 import config
 
 
-def scrape_website(url):
+def scrape_website(url, institution_name=None):
     """
     Webseite laden und den Textinhalt extrahieren.
     Gibt den bereinigten Text zurueck.
+    Wenn keine URL vorhanden, wird automatisch nach der Einrichtung gesucht.
     """
     if config.DEMO_MODE:
         return _get_demo_content(url)
+
+    # Wenn keine URL vorhanden, versuche die Website automatisch zu finden
+    if (not url or not url.startswith("http")) and institution_name:
+        url = _search_website_url(institution_name)
+        if url:
+            print(f"Website automatisch gefunden: {institution_name} -> {url}")
 
     if not url or not url.startswith("http"):
         return ""
@@ -47,6 +54,52 @@ def scrape_website(url):
     except requests.RequestException as e:
         print(f"Fehler beim Laden von {url}: {e}")
         return ""
+
+
+def _search_website_url(institution_name):
+    """
+    Versucht die Website einer Einrichtung zu finden.
+    Generiert moegliche URLs aus dem Namen und prueft ob sie erreichbar sind.
+    """
+    import re
+
+    name = institution_name.lower().strip()
+    # Typische Woerter fuer URL-Generierung bereinigen
+    name_clean = name.replace("freie ", "").replace("schule ", "schule-").replace(" e.v.", "")
+    name_clean = re.sub(r'\s+', '-', name_clean)
+    name_clean = re.sub(r'[^a-z0-9\-]', '', name_clean)
+
+    # Verschiedene URL-Muster ausprobieren
+    candidates = [
+        f"https://www.{name_clean}.de",
+        f"https://{name_clean}.de",
+    ]
+
+    # Zusaetzlich: Stadt aus dem Namen extrahieren und Varianten bilden
+    # z.B. "Freie Waldorfschule Darmstadt" -> "waldorfschule-darmstadt"
+    words = name.split()
+    if len(words) >= 2:
+        # Letztes Wort ist oft die Stadt
+        stadt = words[-1]
+        for w in words:
+            if "schule" in w or "kindergarten" in w or "kita" in w:
+                slug = f"{w}-{stadt}"
+                slug = re.sub(r'[^a-z0-9\-]', '', slug)
+                candidates.append(f"https://www.{slug}.de")
+                candidates.append(f"https://{slug}.de")
+
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; BildungsRadar/1.0)"}
+
+    for url in candidates:
+        try:
+            response = requests.get(url, headers=headers, timeout=5, allow_redirects=True)
+            if response.status_code == 200 and len(response.text) > 500:
+                print(f"Website gefunden: {institution_name} -> {url}")
+                return url
+        except requests.RequestException:
+            continue
+
+    return None
 
 
 def _get_demo_content(url):

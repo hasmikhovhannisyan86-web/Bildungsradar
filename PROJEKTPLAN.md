@@ -19,8 +19,8 @@ Die Top-10 bestbewerteten Einrichtungen werden aufgelistet, deren Webseiten anal
 
 | Aufgabe | Details | Erledigt |
 |---------|---------|----------|
-| Projektidee dokumentieren | BildungsRadar Beschreibung in Notion eintragen | [ ] |
-| 1-3 Projektideen festhalten | BildungsRadar als Hauptidee + 2 Alternativen | [ ] |
+| Projektidee dokumentieren | BildungsRadar Beschreibung in Notion eintragen | [x] |
+| 1-3 Projektideen festhalten | BildungsRadar als Hauptidee + 2 Alternativen | [x] |
 | Lernmaterial | GA101.1 - Introduction to Generative AI and NLP | [ ] |
 
 **Was wir zusammen machen:**
@@ -35,14 +35,14 @@ Die Top-10 bestbewerteten Einrichtungen werden aufgelistet, deren Webseiten anal
 | Aufgabe | Details | Erledigt |
 |---------|---------|----------|
 | Lernmaterial | GA101.2 - Introduction to NLP | [ ] |
-| DB-Schema erstellen | Tabellen: locations, institutions, reviews, comparisons | [ ] |
-| GitHub Repo einrichten | Repo erstellen, .gitignore, README | [ ] |
-| ENV-Datei erstellen | API Keys (OpenAI, Google Maps) sicher speichern | [ ] |
-| Endpoints dokumentieren | Liste aller benötigten API-Endpunkte | [ ] |
-| Flask Backend aufsetzen | Grundstruktur: app.py, routes, config | [ ] |
+| DB-Schema erstellen | Tabellen: locations, institutions, reviews, comparisons | [x] |
+| GitHub Repo einrichten | Repo erstellen, .gitignore, README | [x] |
+| ENV-Datei erstellen | API Keys (OpenAI, Google Maps) sicher speichern | [x] |
+| Endpoints dokumentieren | Liste aller benötigten API-Endpunkte | [x] |
+| Flask Backend aufsetzen | Grundstruktur: app.py, routes, config | [x] |
 | Lernmaterial | GA101.3 - Large Language Models | [ ] |
-| SQLite DB einrichten | Tabellen anlegen, Verbindung testen | [ ] |
-| CRUD Endpoints erstellen | Create/Read/Update/Delete für Einrichtungen | [ ] |
+| SQLite DB einrichten | Tabellen anlegen, Verbindung testen | [x] |
+| CRUD Endpoints erstellen | Create/Read/Update/Delete für Einrichtungen | [x] |
 
 **Was wir zusammen machen:**
 - `app.py` - Flask-App mit Grundkonfiguration
@@ -76,12 +76,12 @@ analyses:      id, institution_id, offerings, prices, specializations, summary, 
 
 | Aufgabe | Details | Erledigt |
 |---------|---------|----------|
-| OpenAI Docs studieren | Text Generation API verstehen | [ ] |
+| OpenAI Docs studieren | Text Generation API verstehen | [x] |
 | Lernmaterial | GA101.4 - Prompt Engineering | [ ] |
-| Text-Generation Endpoint | `/api/analyze` - Webseiten mit KI analysieren | [ ] |
-| System/User Prompt definieren | Prompt für Einrichtungsanalyse iterativ verbessern | [ ] |
-| Structured Output | JSON-Format für Analyse-Ergebnisse definieren | [ ] |
-| DB-Schema anpassen | Analyse-Ergebnisse in DB speichern | [ ] |
+| Text-Generation Endpoint | `/api/analyze` - Webseiten mit KI analysieren | [x] |
+| System/User Prompt definieren | Prompt für Einrichtungsanalyse iterativ verbessern | [x] |
+| Structured Output | JSON-Format für Analyse-Ergebnisse definieren | [x] |
+| DB-Schema anpassen | Analyse-Ergebnisse in DB speichern | [x] |
 
 **Was wir zusammen machen:**
 - OpenAI API Integration (`openai_service.py`)
@@ -110,11 +110,11 @@ analyses:      id, institution_id, offerings, prices, specializations, summary, 
 | Aufgabe | Details | Erledigt |
 |---------|---------|----------|
 | Lernmaterial | GA102.1 - Ethics of Generative AI | [ ] |
-| Temperature experimentieren | Verschiedene Werte testen (0.1 - 1.0) | [ ] |
-| Prompting-Techniken testen | Few-shot, Chain-of-thought, etc. | [ ] |
-| Alle Analyse-Requests iterieren | Qualität der Webseiten-Analyse verbessern | [ ] |
+| Temperature experimentieren | Verschiedene Werte testen (0.1 - 1.0) | [x] |
+| Prompting-Techniken testen | Few-shot, Chain-of-thought, etc. | [x] |
+| Alle Analyse-Requests iterieren | Qualität der Webseiten-Analyse verbessern | [x] |
 | [opt] 2. API-Client (Gemini) | Google Gemini als Alternative testen | [ ] |
-| Vergleichstabelle erstellen | API/Prompt-Vergleich dokumentieren | [ ] |
+| Vergleichstabelle erstellen | API/Prompt-Vergleich dokumentieren | [x] |
 
 **Was wir zusammen machen:**
 - Google Places API Integration (`google_maps_service.py`)
@@ -134,7 +134,7 @@ analyses:      id, institution_id, offerings, prices, specializations, summary, 
 | Lernmaterial | GA102.2 - Advanced GenAI Engineering | [ ] |
 | RAG studieren | LangChain RAG Tutorial | [ ] |
 | [opt] VectorDB einrichten | Embeddings für Einrichtungsdaten | [ ] |
-| [opt] Frontend verbessern | Responsive Design, Karte, UX | [ ] |
+| [opt] Frontend verbessern | Responsive Design, Karte, UX | [x] |
 | [opt] Deployment | Render/Railway/Heroku | [ ] |
 
 **Was wir zusammen machen (optional):**
@@ -150,8 +150,8 @@ analyses:      id, institution_id, offerings, prices, specializations, summary, 
 
 | Aufgabe | Details | Erledigt |
 |---------|---------|----------|
-| Repo aufräumen | Code-Qualität, Kommentare, Structure | [ ] |
-| README erstellen | Installation, Usage, Screenshots | [ ] |
+| Repo aufräumen | Code-Qualität, Kommentare, Structure | [x] |
+| README erstellen | Installation, Usage, Screenshots | [x] |
 | Präsentation (3-5 Folien) | Projektidee, Flow, Tech-Stack | [ ] |
 | Video (3-5 Min) | Projekt-Demo mit Erklärung | [ ] |
 | Präsentation halten | Projekt vorstellen! | [ ] |

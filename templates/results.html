@@ -4,10 +4,20 @@
 
 {% block content %}
 <div class="results-page">
-    <h2>Ergebnisse fuer "{{ location }}"</h2>
+    <h2>Ergebnisse für "{{ location }}"</h2>
     <p class="result-count">
         {{ institutions|length }} Einrichtungen gefunden
-        {% if cached %}<span class="cache-badge">aus Datenbank geladen</span>{% endif %}
+        {% if cached %}
+            <span class="cache-badge">aus Datenbank geladen</span>
+            <a href="{{ url_for('search', location=location, type=active_filter if active_filter != 'all' else None, live=1) }}"
+               class="cache-badge"
+               style="background:#27ae60;color:white;text-decoration:none;cursor:pointer;"
+               title="Live von OpenStreetMap neu laden">
+                &#128260; Live aktualisieren
+            </a>
+        {% else %}
+            <span class="cache-badge" style="background:#27ae60;color:white;">&#127760; Live von OpenStreetMap</span>
+        {% endif %}
     </p>
 
     <!-- Google Bewertungen laden -->
@@ -21,28 +31,39 @@
         <span id="rating-status" style="margin-left: 10px; color: #666;"></span>
     </div>
 
-    <!-- Filter-Toggles mit Zaehler -->
+    <!-- Filter-Toggles als Links (Server-seitige Filterung mit ?type=) -->
     <div class="filter-bar">
-        <button class="filter-btn {% if active_filter == 'all' %}active{% endif %}" data-filter="all">
-            Alle <span class="badge">{{ institutions|length }}</span>
-        </button>
-        <button class="filter-btn {% if active_filter == 'kindergarten' %}active{% endif %}" data-filter="kindergarten">
-            &#127979; Kindergaerten <span class="badge">{{ counts.kindergarten }}</span>
-        </button>
-        <button class="filter-btn {% if active_filter == 'kita' %}active{% endif %}" data-filter="kita">
+        {% set total = counts.kindergarten + counts.kita + counts.schule + counts.privatschule %}
+        <a class="filter-btn {% if active_filter == 'all' %}active{% endif %}"
+           data-filter="all"
+           href="{{ url_for('search', location=location) }}">
+            Alle <span class="badge">{{ total }}</span>
+        </a>
+        <a class="filter-btn {% if active_filter == 'kindergarten' %}active{% endif %}"
+           data-filter="kindergarten"
+           href="{{ url_for('search', location=location, type='kindergarten') }}">
+            &#127979; Kindergärten <span class="badge">{{ counts.kindergarten }}</span>
+        </a>
+        <a class="filter-btn {% if active_filter == 'kita' %}active{% endif %}"
+           data-filter="kita"
+           href="{{ url_for('search', location=location, type='kita') }}">
             &#128118; Kitas <span class="badge">{{ counts.kita }}</span>
-        </button>
-        <button class="filter-btn {% if active_filter == 'schule' %}active{% endif %}" data-filter="schule">
+        </a>
+        <a class="filter-btn {% if active_filter == 'schule' %}active{% endif %}"
+           data-filter="schule"
+           href="{{ url_for('search', location=location, type='schule') }}">
             &#127891; Schulen <span class="badge">{{ counts.schule }}</span>
-        </button>
-        <button class="filter-btn {% if active_filter == 'privatschule' %}active{% endif %}" data-filter="privatschule">
+        </a>
+        <a class="filter-btn {% if active_filter == 'privatschule' %}active{% endif %}"
+           data-filter="privatschule"
+           href="{{ url_for('search', location=location, type='privatschule') }}">
             &#11088; Privatschulen <span class="badge">{{ counts.privatschule }}</span>
-        </button>
+        </a>
     </div>
 
     <!-- Vergleich-Leiste -->
     <div class="compare-bar" id="compare-bar" style="display:none;">
-        <span id="compare-count">0</span> ausgewaehlt
+        <span id="compare-count">0</span> ausgewählt
         <button onclick="openCompare()" class="btn-compare">Vergleichen</button>
     </div>
 
@@ -114,7 +135,18 @@
                 <div class="analysis-result">
                     <h4>KI-Analyse</h4>
                     <p><strong>Zusammenfassung:</strong> {{ inst.analysis.summary }}</p>
-                    <p><strong>Preise:</strong> {{ inst.analysis.prices }}</p>
+                    <div class="analysis-prices">
+                        <strong>Preise:</strong>
+                        {% if inst.analysis.prices is mapping %}
+                            <ul style="margin:4px 0 4px 20px;">
+                            {% for key, value in inst.analysis.prices.items() %}
+                                <li><strong>{{ key }}:</strong> {{ value }}</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            {{ inst.analysis.prices }}
+                        {% endif %}
+                    </div>
                     {% if inst.analysis.offerings %}
                     <p><strong>Angebote:</strong> {{ inst.analysis.offerings|join(", ") }}</p>
                     {% endif %}

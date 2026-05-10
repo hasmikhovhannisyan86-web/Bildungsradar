@@ -3,40 +3,10 @@
  * Handhabt Filter, KI-Analyse und Vergleichsfunktion.
  */
 
-// --- Filter-Funktion ---
-// Zeigt/versteckt Einrichtungen nach Kategorie
-document.addEventListener("DOMContentLoaded", function () {
-    var filterButtons = document.querySelectorAll(".filter-btn");
-
-    function applyFilter(filterType) {
-        var cards = document.querySelectorAll(".institution-card");
-        cards.forEach(function (card) {
-            if (filterType === "all" || card.getAttribute("data-type") === filterType) {
-                card.classList.remove("hidden");
-            } else {
-                card.classList.add("hidden");
-            }
-        });
-    }
-
-    filterButtons.forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            var filterType = this.getAttribute("data-filter");
-
-            // Aktiven Button markieren
-            filterButtons.forEach(function (b) { b.classList.remove("active"); });
-            this.classList.add("active");
-
-            applyFilter(filterType);
-        });
-    });
-
-    // Beim Laden: den aktuell aktiven Filter anwenden (fuer serverseitig gesetzten Filter)
-    var activeBtn = document.querySelector(".filter-btn.active");
-    if (activeBtn) {
-        applyFilter(activeBtn.getAttribute("data-filter"));
-    }
-});
+// --- Filter-Buttons sind <a>-Links: Server filtert per ?type= URL-Parameter
+// Kein zusaetzliches Frontend-Filter-JS noetig, weil der Server schon nur die
+// passenden Einrichtungen sendet. Die Active-Klasse wird vom Template gesetzt.
+//
 
 
 // --- KI-Analyse starten ---
@@ -68,7 +38,17 @@ function analyzeInstitution(institutionId, button) {
                 var html = '<div class="analysis-result">';
                 html += "<h4>KI-Analyse</h4>";
                 html += "<p><strong>Zusammenfassung:</strong> " + analysis.summary + "</p>";
-                html += "<p><strong>Preise:</strong> " + analysis.prices + "</p>";
+
+                // Preise: kann String ODER Objekt sein
+                if (analysis.prices && typeof analysis.prices === "object" && !Array.isArray(analysis.prices)) {
+                    html += '<div><strong>Preise:</strong><ul style="margin:4px 0 4px 20px;">';
+                    Object.keys(analysis.prices).forEach(function (key) {
+                        html += "<li><strong>" + key + ":</strong> " + analysis.prices[key] + "</li>";
+                    });
+                    html += "</ul></div>";
+                } else {
+                    html += "<p><strong>Preise:</strong> " + (analysis.prices || "Keine Angabe") + "</p>";
+                }
 
                 if (analysis.offerings && analysis.offerings.length > 0) {
                     html += "<p><strong>Angebote:</strong> " + analysis.offerings.join(", ") + "</p>";

@@ -332,10 +332,11 @@ def _search_overpass_by_area(location):
     import time
 
     # Verschiedene admin_levels probieren:
-    # 6 = kreisfreie Staedte (Berlin, Hamburg, Muenchen, Koeln, Frankfurt...)
+    # 4 = Stadtstaaten / Bundeslaender (Berlin, Bremen sind Stadtstaaten!)
+    # 6 = kreisfreie Staedte (Hamburg, Muenchen, Koeln, Frankfurt...)
     # 8 = Gemeinden (kleinere Staedte und Doerfer)
     # 7 = Verwaltungsgemeinschaften
-    for admin_level in ["6", "8", "7"]:
+    for admin_level in ["6", "4", "8", "7"]:
         query = f"""
         [out:json][timeout:60];
         area["name"="{location}"]["boundary"="administrative"]["admin_level"="{admin_level}"]->.searchArea;

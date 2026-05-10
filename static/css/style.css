@@ -133,9 +133,11 @@ body {
     cursor: pointer;
     font-size: 0.9rem;
     transition: all 0.2s;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
+    text-decoration: none;
+    color: inherit;
 }
 .filter-btn:hover { border-color: #3498db; }
 .filter-btn.active {

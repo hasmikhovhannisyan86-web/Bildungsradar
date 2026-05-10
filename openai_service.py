@@ -53,23 +53,40 @@ Wenn eine Information nicht verfuegbar ist, verwende 'Keine Angabe'."""
 Analysiere Webseiten-Inhalte und extrahiere strukturierte Informationen.
 Antworte ausschliesslich im JSON-Format.
 
-Hier ist ein Beispiel fuer eine gute Analyse:
+REGEL: Verwende NUR Informationen, die WIRKLICH im Webseiten-Inhalt stehen.
+Erfinde NIEMALS Preise oder andere Daten! Wenn etwas nicht auf der Webseite steht,
+gib das ehrlich an.
 
-Eingabe: "Kita Sonnenschein - Wir bieten Ganztagsbetreuung fuer Kinder von 1-6 Jahren. Unsere Schwerpunkte sind Montessori-Paedagogik und Sprachfoerderung. Monatliche Kosten: 280-350 EUR. Oeffnungszeiten: Mo-Fr 7:00-17:00. Gruppengroesse: 15 Kinder."
+Das 'prices'-Feld muss ein JSON-OBJEKT sein (key/value).
+Bei oeffentlichen Schulen ist das Schulgeld bekanntermassen 0 EUR (gesetzlich).
+Bei oeffentlichen Kitas ist der Beitrag einkommensabhaengig (Buergerliche Allgemeinwissen).
+
+Beispiel einer guten Analyse einer Privat-Kita mit echten Daten:
+
+Eingabe: "Kita Sonnenschein - Ganztagsbetreuung 1-6 Jahre. Montessori, Sprachfoerderung. Kosten: 280-350 EUR/Monat. Mo-Fr 7-17 Uhr. 15 Kinder pro Gruppe."
 
 Ergebnis:
 {{
     "offerings": ["Ganztagsbetreuung", "Sprachfoerderung", "Montessori-Paedagogik"],
-    "prices": "280-350 EUR/Monat",
+    "prices": {{
+        "Monatsbeitrag": "280-350 EUR/Monat",
+        "Quelle": "Direkt von Webseite"
+    }},
     "specializations": ["Montessori-Paedagogik", "Sprachfoerderung"],
     "age_groups": "1-6 Jahre",
     "opening_hours": "Mo-Fr 7:00-17:00",
     "group_size": "15 Kinder pro Gruppe",
-    "summary": "Kita Sonnenschein ist eine Ganztagseinrichtung mit Montessori-Ansatz und Sprachfoerderung fuer Kinder von 1-6 Jahren. Die monatlichen Kosten liegen bei 280-350 EUR."
+    "summary": "Kita Sonnenschein bietet Ganztagsbetreuung mit Montessori-Schwerpunkt fuer 1-6 Jaehrige zu 280-350 EUR/Monat."
 }}
 
-Orientiere dich an diesem Format und dieser Detailtiefe.
-WICHTIG: Suche besonders gruendlich nach Preisen, Schulgeldern, Elternbeitraegen und Kosten!""",
+Beispiel einer Privatschule OHNE Preis-Info auf Webseite:
+
+Ergebnis (prices-Feld):
+{{
+    "Schulgeld": "Nicht auf Webseite angegeben",
+    "Hinweis": "Bitte direkt bei der Schule erfragen",
+    "Quelle": "Webseite enthaelt keine Preisangaben"
+}}""",
         "user": """Analysiere diese Bildungseinrichtung:
 
 Name: {name}
@@ -77,8 +94,20 @@ Typ: {type}
 Webseiten-Inhalt:
 {content}
 
-Extrahiere die Informationen als JSON mit den Feldern: offerings, prices (Schulgeld/Elternbeitraege/Kosten mit EUR-Betraegen - suche gruendlich!), specializations, age_groups, opening_hours, group_size, rating (Bewertung als Zahl 1.0-5.0 falls erwaehnt), summary.
-Wenn eine Information nicht verfuegbar ist, verwende 'Keine Angabe'."""
+Gib das Ergebnis als JSON zurueck mit den Feldern: offerings, prices, specializations, age_groups, opening_hours, group_size, rating (Zahl 1.0-5.0 falls erwaehnt), summary.
+
+REGELN fuer das 'prices'-Feld (JSON-OBJEKT, kein String):
+
+1. ECHTE Preise im Text gefunden -> exakt uebernehmen mit Quelle "Webseite":
+   {{"Schulgeld": "250 EUR/Monat", "Aufnahmegebuehr": "300 EUR", "Quelle": "Webseite"}}
+
+2. Oeffentliche Schule (gesetzlich kostenfrei) -> Bekanntes Wissen:
+   {{"Schulgeld": "0 EUR (oeffentliche Schule, gesetzlich kostenfrei)", "Materialgeld": "Nicht angegeben"}}
+
+3. Privatschule/Privatkita OHNE Preisangaben auf Webseite -> EHRLICH:
+   {{"Schulgeld": "Nicht auf Webseite angegeben", "Hinweis": "Bitte direkt anfragen", "Quelle": "Keine Angabe auf Webseite"}}
+
+NIE Preise erfinden! Lieber ehrlich 'Nicht auf Webseite angegeben' als Fantasiezahlen."""
     },
 
     "v3": {

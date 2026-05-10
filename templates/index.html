@@ -3,7 +3,7 @@
 {% block content %}
 <div class="hero">
     <h1>BildungsRadar</h1>
-    <p class="subtitle">Finde und vergleiche Kindergaerten, Kitas und Schulen in deiner Naehe.</p>
+    <p class="subtitle">Finde und vergleiche Kindergärten, Kitas und Schulen in deiner Nähe.</p>
 
     <form id="search-form" action="{{ url_for('search') }}" method="GET" class="search-form">
         <div class="search-box">
@@ -17,22 +17,21 @@
             >
             <button type="submit" id="search-btn">Suchen</button>
         </div>
-        <p id="nlp-status" style="margin-top: 8px; font-size: 0.9em; color: #666; display: none;"></p>
     </form>
-    {# Server-seitiger Parser in app.py (parse_search_query) uebernimmt die
-       Ortsextraktion bei natuerlichen Anfragen wie "Ich suche Kindergarten in Marl".
-       Kein zusaetzliches Frontend-JavaScript noetig. #}
+    {# Server-seitiger Parser in app.py (parse_search_query) übernimmt die
+       Ortsextraktion bei natürlichen Anfragen wie "Ich suche Kindergarten in Marl".
+       Kein zusätzliches Frontend-JavaScript nötig. #}
 
     <div class="features">
         <div class="feature-card">
             <div class="feature-icon">&#128269;</div>
             <h3>Suchen</h3>
-            <p>Gib einen Ort ein und finde alle Bildungseinrichtungen in der Naehe.</p>
+            <p>Gib einen Ort ein und finde alle Bildungseinrichtungen in der Nähe.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon">&#9881;</div>
             <h3>Filtern</h3>
-            <p>Filtere nach Kindergaerten, Kitas oder Schulen mit einem Klick.</p>
+            <p>Filtere nach Kindergärten, Kitas oder Schulen mit einem Klick.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon">&#129302;</div>

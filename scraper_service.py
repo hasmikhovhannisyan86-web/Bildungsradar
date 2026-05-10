@@ -50,9 +50,9 @@ def scrape_website(url, institution_name=None):
         if price_content:
             clean_text += "\n\n--- WEITERE INFORMATIONEN (Unterseiten) ---\n" + price_content
 
-        # Text auf max. 10000 Zeichen begrenzen (fuer OpenAI Token-Limit)
-        if len(clean_text) > 10000:
-            clean_text = clean_text[:10000] + "..."
+        # Text auf max. 15000 Zeichen begrenzen (fuer OpenAI Token-Limit)
+        if len(clean_text) > 15000:
+            clean_text = clean_text[:15000] + "..."
 
         return clean_text
 
@@ -64,12 +64,18 @@ def scrape_website(url, institution_name=None):
 def _find_price_pages(base_url, soup, headers):
     """
     Sucht nach Unterseiten mit Preisinformationen (Schulgeld, Beitraege, Kosten).
+    Durchsucht bis zu 5 Unterseiten aggressiv.
     """
     import urllib.parse
 
-    price_keywords = ["kosten", "beitr", "schulgeld", "gebuehr", "preise", "elternbeitrag",
-                       "aufnahme", "anmeldung", "finanz"]
-    found_urls = set()
+    price_keywords = [
+        "kosten", "beitr", "schulgeld", "gebuehr", "preise", "elternbeitrag",
+        "aufnahme", "anmeldung", "finanz", "foerderbeitrag", "essensgeld",
+        "hortbeitrag", "betreuungsbeitrag", "monatsbeitrag", "jahresbeitrag",
+        "entgelt", "tarif", "zahlung", "sozial", "einkommensabhaengig"
+    ]
+    found_urls = []
+    seen = set()
 
     for link in soup.find_all("a", href=True):
         href = link.get("href", "").lower()
@@ -78,11 +84,12 @@ def _find_price_pages(base_url, soup, headers):
         for kw in price_keywords:
             if kw in href or kw in link_text:
                 full_url = urllib.parse.urljoin(base_url, link.get("href"))
-                if full_url.startswith("http") and full_url not in found_urls:
-                    found_urls.add(full_url)
+                if full_url.startswith("http") and full_url not in seen and base_url.split("/")[2] in full_url:
+                    seen.add(full_url)
+                    found_urls.append(full_url)
                 break
 
-        if len(found_urls) >= 2:
+        if len(found_urls) >= 5:
             break
 
     if not found_urls:
@@ -96,16 +103,27 @@ def _find_price_pages(base_url, soup, headers):
                 psoup = BeautifulSoup(resp.text, "html.parser")
                 for tag in psoup(["script", "style", "nav", "footer", "iframe", "noscript", "svg"]):
                     tag.decompose()
+
+                # Tabellen mit Preisen bevorzugt extrahieren
+                tables = psoup.find_all("table")
+                table_text = ""
+                for table in tables:
+                    table_text += table.get_text(separator=" | ", strip=True) + "\n"
+
                 text = psoup.get_text(separator="\n", strip=True)
                 lines = [l.strip() for l in text.splitlines() if l.strip()]
                 content = "\n".join(lines)
-                if len(content) > 4000:
-                    content = content[:4000]
-                price_texts.append(content)
+
+                if table_text:
+                    content = "TABELLEN:\n" + table_text + "\n\n" + content
+
+                if len(content) > 5000:
+                    content = content[:5000]
+                price_texts.append(f"[Unterseite: {url}]\n{content}")
         except requests.RequestException:
             continue
 
-    return "\n".join(price_texts)
+    return "\n\n".join(price_texts)
 
 
 def _search_website_url(institution_name):
@@ -147,33 +165,63 @@ def _search_website_url(institution_name):
 
     # Methode 2: URL-Muster aus dem Namen generieren (Fallback)
     name = institution_name.lower().strip()
-    name_clean = name.replace("freie ", "").replace("schule ", "schule-").replace(" e.v.", "")
-    name_clean = re.sub(r'[^a-z0-9\s\-]', '', name_clean)
 
     # Umlaute ersetzen
-    for old, new in [("ae", "ae"), ("oe", "oe"), ("ue", "ue"), ("ss", "ss")]:
-        name_clean = name_clean.replace(old, new)
+    umlaut_map = [("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss"),
+                  ("ae", "ae"), ("oe", "oe"), ("ue", "ue")]
+    name_norm = name
+    for old, new in umlaut_map:
+        name_norm = name_norm.replace(old, new)
 
-    name_clean = re.sub(r'\s+', '-', name_clean.strip())
+    # Stoerwoerter entfernen
+    stop_words = ["freie", "freier", "freies", "evangelische", "evangelischer",
+                  "katholische", "staatliche", "private", "internationale",
+                  "e.v.", "ev.", "ggmbh", "gmbh", "e. v."]
+    words_all = re.sub(r'[^a-z0-9\s]', '', name_norm).split()
+    words_filtered = [w for w in words_all if w not in stop_words and len(w) > 1]
 
-    candidates = [
-        f"https://www.{name_clean}.de",
-        f"https://{name_clean}.de",
-    ]
+    # Stadt ist meist das letzte Wort
+    stadt = words_all[-1] if words_all else ""
 
-    # Stadt aus dem Namen extrahieren
-    words = name.split()
-    if len(words) >= 2:
-        stadt = re.sub(r'[^a-z0-9]', '', words[-1])
-        for w in words:
-            if "schule" in w or "kindergarten" in w or "kita" in w:
-                slug = re.sub(r'[^a-z0-9]', '', w) + "-" + stadt
-                candidates.append(f"https://www.{slug}.de")
-                candidates.append(f"https://{slug}.de")
-                # Auch mit "freie-" Prefix
-                candidates.append(f"https://www.freie-{slug}.de")
+    # Typ-Schluesselwort finden
+    type_words = [w for w in words_filtered if w in ["schule", "kindergarten", "kita",
+                                                       "montessori", "waldorf", "gymnasium"]]
 
-    for url in candidates:
+    candidates = set()
+
+    # Voller Name mit Bindestrichen
+    full_slug = "-".join(words_filtered)
+    candidates.add(f"https://www.{full_slug}.de")
+    candidates.add(f"https://{full_slug}.de")
+
+    # Ohne Stoerwoerter
+    clean_slug = "-".join(words_filtered)
+    candidates.add(f"https://www.{clean_slug}.de")
+
+    # Typ + Stadt Kombinationen
+    for tw in type_words:
+        candidates.add(f"https://www.{tw}-{stadt}.de")
+        candidates.add(f"https://{tw}-{stadt}.de")
+        candidates.add(f"https://www.{tw}{stadt}.de")
+
+    # Nur Typ-Wort + Stadt ohne "schule"
+    if stadt:
+        # z.B. "montessori-darmstadt.de"
+        for tw in type_words:
+            if tw not in ["schule", "kita", "kindergarten"]:
+                candidates.add(f"https://www.{tw}-{stadt}.de")
+                candidates.add(f"https://{tw}-{stadt}.de")
+
+        # Erste 2 Schluesselwoerter + Stadt
+        key_words = [w for w in words_filtered if w != stadt][:2]
+        if key_words:
+            slug2 = "-".join(key_words + [stadt])
+            candidates.add(f"https://www.{slug2}.de")
+            candidates.add(f"https://{slug2}.de")
+            slug2b = "-".join(key_words)
+            candidates.add(f"https://www.{slug2b}-{stadt}.de")
+
+    for url in sorted(candidates):
         try:
             response = requests.get(url, headers=headers, timeout=5, allow_redirects=True)
             if response.status_code == 200 and len(response.text) > 500:

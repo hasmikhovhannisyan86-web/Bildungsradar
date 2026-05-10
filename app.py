@@ -32,32 +32,82 @@ def search():
     # -> location="Marl", type_filter="kindergarten"
     from google_maps_service import parse_search_query, _correct_city_name, _geocode_location
     location, type_filter = parse_search_query(raw_query)
+
+    # Expliziter Typ-Parameter aus URL hat Vorrang (z.B. Filter-Button-Click)
+    explicit_type = request.args.get("type", "").strip().lower()
+    if explicit_type in ("kindergarten", "kita", "schule", "privatschule"):
+        type_filter = explicit_type
+
     if type_filter:
         print(f"Typ-Filter erkannt: {type_filter}")
 
-    # Ortsname korrigieren: Zuerst Nominatim fragen, dann Fuzzy-Korrektur
+    # Ortsname korrigieren: Zuerst Nominatim fragen, dann Tippfehler-Varianten
     geocode_result = _geocode_location(location)
-    if geocode_result:
-        # Nominatim hat den Ort gefunden -> korrekten Namen verwenden
-        _, _, corrected_location = geocode_result
-    else:
-        # Nominatim findet nichts -> Tippfehler-Korrektur versuchen
-        corrected_location = _correct_city_name(location)
-    if corrected_location.lower() != location.lower():
-        print(f"Eingabe korrigiert: '{location}' -> '{corrected_location}'")
-    location = corrected_location
+    if not geocode_result:
+        # 1) Doppelbuchstaben-Reduktion (z.B. "Marrl" -> "Marl", "Buxtehuhde" -> "Buxtehude")
+        import re as _re
+        reduced = _re.sub(r'([a-zA-ZäöüÄÖÜß])\1+', r'\1', location)
+        if reduced != location:
+            print(f"Versuche reduzierte Variante: '{location}' -> '{reduced}'")
+            geocode_result = _geocode_location(reduced)
+            if geocode_result:
+                location = reduced
+        # 2) Falls noch nicht gefunden: Fuzzy gegen DEUTSCHE_STAEDTE-Liste
+        if not geocode_result:
+            corrected_input = _correct_city_name(location)
+            if corrected_input.lower() != location.lower():
+                print(f"Tippfehler-Korrektur (Liste): '{location}' -> '{corrected_input}'")
+                geocode_result = _geocode_location(corrected_input)
+                if geocode_result:
+                    location = corrected_input
 
-    # Pruefen ob Ergebnisse bereits in der Datenbank gespeichert sind (Caching)
-    cached_search_id = database.find_cached_search(location)
+    if geocode_result:
+        _, _, corrected_location = geocode_result
+        if corrected_location.lower() != location.lower():
+            print(f"Eingabe korrigiert: '{location}' -> '{corrected_location}'")
+        location = corrected_location
+
+    # Live-Suche: erzwungen wenn ...
+    #   1) ?live=1 oder ?fresh=1 in URL  (z.B. "Live aktualisieren"-Button)
+    #   2) Browser-Refresh (F5/Cmd+R) sendet Cache-Control: no-cache
+    #   3) Pragma: no-cache (Hard-Reload)
+    cache_ctrl = request.headers.get("Cache-Control", "").lower()
+    pragma = request.headers.get("Pragma", "").lower()
+    is_refresh = "no-cache" in cache_ctrl or "max-age=0" in cache_ctrl or "no-cache" in pragma
+
+    force_live = (
+        request.args.get("live", "").strip() in ("1", "true", "yes")
+        or request.args.get("fresh", "").strip() in ("1", "true", "yes")
+        or is_refresh
+    )
+
+    # Filter-Button-Klick (=> ?type=...) ist NIE ein Refresh,
+    # auch wenn der Browser Cache-Control no-cache senden wuerde.
+    if request.args.get("type", "").strip().lower() in ("kindergarten", "kita", "schule", "privatschule"):
+        force_live = (
+            request.args.get("live", "").strip() in ("1", "true", "yes")
+            or request.args.get("fresh", "").strip() in ("1", "true", "yes")
+        )
+
+    cached_search_id = None if force_live else database.find_cached_search(location)
 
     if cached_search_id:
         # Gespeicherte Ergebnisse aus DB laden (schnell!)
         search_id = cached_search_id
         print(f"Cache-Treffer fuer '{location}' (search_id={search_id})")
     else:
-        # Neue Suche ueber OpenStreetMap ausfuehren
+        # Neue LIVE-Suche ueber OpenStreetMap ausfuehren
         from google_maps_service import search_institutions
+        if force_live:
+            print(f"LIVE-Suche fuer '{location}' (Cache wird ignoriert)")
         results = search_institutions(location)
+
+        # Bei Live-Suche: alten Cache-Eintrag fuer denselben Ort loeschen
+        if force_live:
+            old_id = database.find_cached_search(location)
+            if old_id:
+                database.delete_search(old_id)
+                print(f"Alter Cache fuer '{location}' geloescht (search_id={old_id})")
 
         # Suchanfrage in DB speichern
         search_id = database.save_search(location)
@@ -78,17 +128,29 @@ def search():
     # Ergebnisse aus DB laden (sortiert nach Bewertung)
     institutions = database.get_search_results(search_id)
 
-    # Analysen und Favoriten-Status laden
+    # Analysen + Favoriten laden:
+    # KI-Analysen werden NUR bei Favoriten dauerhaft angezeigt.
+    # Fuer nicht-Favoriten: erst sichtbar, wenn man "KI-Analyse starten" klickt
+    # (dann via JavaScript im Browser, ohne Refresh).
     for inst in institutions:
-        inst["analysis"] = database.get_analysis(inst["id"])
         inst["is_favorite"] = database.is_favorite(inst["id"])
+        if inst["is_favorite"]:
+            inst["analysis"] = database.get_analysis(inst["id"])
+        else:
+            inst["analysis"] = None
 
-    # Zaehler pro Kategorie berechnen
+    # Zaehler pro Kategorie berechnen (von ALLEN Einrichtungen, fuer Filter-Buttons)
     counts = {"kindergarten": 0, "kita": 0, "schule": 0, "privatschule": 0}
     for inst in institutions:
         t = inst.get("type", "").lower()
         if t in counts:
             counts[t] += 1
+
+    # Wenn ein Typ aus der Anfrage erkannt wurde -> nur diese Einrichtungen anzeigen
+    # (z.B. "Privatschulen in Muenchen" -> nur die Privatschulen, nicht alle 1389)
+    if type_filter and type_filter in counts:
+        institutions = [i for i in institutions if i.get("type", "").lower() == type_filter]
+        print(f"Server-seitig gefiltert auf '{type_filter}': {len(institutions)} Einrichtungen")
 
     return render_template(
         "results.html",
@@ -178,7 +240,16 @@ def analyze_institution(institution_id):
     temperature = float(temperature)
 
     from openai_service import analyze_website
+    import json as _json
     analysis = analyze_website(institution, prompt_version, temperature)
+
+    # Sicherstellen dass alle Felder Strings sind (OpenAI gibt manchmal Dicts zurueck)
+    for field in ["prices", "age_groups", "opening_hours", "group_size", "rating", "summary"]:
+        val = analysis.get(field)
+        if isinstance(val, (dict, list)):
+            analysis[field] = _json.dumps(val, ensure_ascii=False)
+        elif val is None:
+            analysis[field] = "Keine Angabe"
 
     database.save_analysis(
         institution_id,
@@ -335,6 +406,13 @@ def delete_institution_route(institution_id):
 
 if __name__ == "__main__":
     database.init_db()
+
+    # Cache nur im Haupt-Prozess leeren (nicht im Werkzeug-Reloader-Watcher)
+    # Damit erste Suche nach Server-Start IMMER live von OpenStreetMap kommt
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        cleared = database.clear_search_cache()
+        print(f"Such-Cache geleert: {cleared} alte Suchen entfernt - erste Suchen sind LIVE")
+
     port = int(os.environ.get("PORT", 5001))
     print("BildungsRadar gestartet!")
     print(f"Demo-Modus: {'AN' if config.DEMO_MODE else 'AUS'}")

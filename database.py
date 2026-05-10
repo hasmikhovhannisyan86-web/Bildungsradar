@@ -104,9 +104,22 @@ def find_cached_search(location_name):
 # --- CRUD Operationen fuer Suchanfragen ---
 
 def save_search(location_name, lat=None, lng=None):
-    """Neue Suchanfrage speichern."""
+    """Neue Suchanfrage speichern.
+    Schutz gegen Duplikate: Wenn der Ort schon existiert, alte Eintraege
+    inkl. ihrer search_results loeschen, dann neuen Eintrag anlegen.
+    """
     conn = get_db()
     cursor = conn.cursor()
+    # Alle alten Eintraege fuer diesen Ort finden und loeschen
+    cursor.execute(
+        "SELECT id FROM searches WHERE LOWER(location_name) = LOWER(?)",
+        (location_name,)
+    )
+    old_ids = [row[0] for row in cursor.fetchall()]
+    for old_id in old_ids:
+        cursor.execute("DELETE FROM search_results WHERE search_id = ?", (old_id,))
+        cursor.execute("DELETE FROM searches WHERE id = ?", (old_id,))
+    # Neuen Eintrag anlegen
     cursor.execute(
         "INSERT INTO searches (location_name, lat, lng) VALUES (?, ?, ?)",
         (location_name, lat, lng)
@@ -125,6 +138,24 @@ def delete_search(search_id):
     cursor.execute("DELETE FROM searches WHERE id = ?", (search_id,))
     conn.commit()
     conn.close()
+
+
+def clear_search_cache():
+    """
+    Loescht ALLE Such-Cache-Eintraege (searches + search_results).
+    Wird beim Server-Start aufgerufen, damit erste Suche jedes Orts wieder
+    LIVE von OpenStreetMap kommt. Institutions, Analyses und Favoriten
+    bleiben erhalten.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM searches")
+    count = cursor.fetchone()[0]
+    cursor.execute("DELETE FROM search_results")
+    cursor.execute("DELETE FROM searches")
+    conn.commit()
+    conn.close()
+    return count
 
 
 def get_search(search_id):
@@ -255,6 +286,12 @@ def save_analysis(institution_id, analysis_data, model_used, temperature, prompt
     """KI-Analyse einer Einrichtung speichern."""
     conn = get_db()
     cursor = conn.cursor()
+
+    # Preise koennen String ODER Dict sein -> immer als JSON-String speichern
+    prices_value = analysis_data.get("prices", "")
+    if isinstance(prices_value, (dict, list)):
+        prices_value = json.dumps(prices_value, ensure_ascii=False)
+
     cursor.execute("""
         INSERT INTO analyses
         (institution_id, offerings, prices, specializations, age_groups,
@@ -263,7 +300,7 @@ def save_analysis(institution_id, analysis_data, model_used, temperature, prompt
     """, (
         institution_id,
         json.dumps(analysis_data.get("offerings", []), ensure_ascii=False),
-        analysis_data.get("prices", ""),
+        prices_value,
         json.dumps(analysis_data.get("specializations", []), ensure_ascii=False),
         analysis_data.get("age_groups", ""),
         analysis_data.get("summary", ""),
@@ -291,6 +328,17 @@ def get_analysis(institution_id):
         result = dict(row)
         result["offerings"] = json.loads(result["offerings"]) if result["offerings"] else []
         result["specializations"] = json.loads(result["specializations"]) if result["specializations"] else []
+
+        # Preise koennen JSON-String (Objekt) oder normaler Text sein
+        # Versuchen als JSON zu parsen; bei Fehler als String belassen
+        if result.get("prices"):
+            try:
+                parsed = json.loads(result["prices"])
+                if isinstance(parsed, (dict, list)):
+                    result["prices"] = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass  # bleibt String
+
         # Rating aus raw_response extrahieren (wird von KI-Analyse geliefert)
         if result.get("raw_response"):
             try:
@@ -365,9 +413,17 @@ def _extract_rating(analysis_dict):
 
 
 def search_institutions_by_name(query):
-    """Einrichtungen nach Name in der DB suchen."""
+    """Einrichtungen nach Name in der DB suchen.
+    Mit Tippfehler-Korrektur via Fuzzy-Matching (difflib).
+    Strategie:
+      1. Erst LIKE-Suche (schnell, exakt)
+      2. Falls weniger als 5 Treffer: Fuzzy-Matching ueber alle Namen
+    """
+    from difflib import SequenceMatcher
     conn = get_db()
     cursor = conn.cursor()
+
+    # 1) Exakte / Substring-Suche
     cursor.execute("""
         SELECT id, name, type, address
         FROM institutions
@@ -376,6 +432,33 @@ def search_institutions_by_name(query):
         LIMIT 20
     """, (f"%{query}%",))
     results = [dict(row) for row in cursor.fetchall()]
+
+    # 2) Wenn zu wenig Treffer -> Fuzzy-Suche fuer Tippfehler-Korrektur
+    if len(results) < 5 and len(query) >= 3:
+        cursor.execute("SELECT id, name, type, address FROM institutions")
+        all_institutions = [dict(row) for row in cursor.fetchall()]
+        query_lower = query.lower()
+        already_ids = {r["id"] for r in results}
+
+        # Aehnlichkeit jedes Namens zur Anfrage berechnen
+        scored = []
+        for inst in all_institutions:
+            if inst["id"] in already_ids:
+                continue
+            name_lower = inst["name"].lower()
+            # Score = beste Aehnlichkeit zwischen query und einzelnen Worten/dem ganzen Namen
+            score = SequenceMatcher(None, query_lower, name_lower).ratio()
+            for word in name_lower.split():
+                word_score = SequenceMatcher(None, query_lower, word).ratio()
+                if word_score > score:
+                    score = word_score
+            if score >= 0.7:  # 70% Aehnlichkeit reicht fuer Tippfehler
+                scored.append((score, inst))
+
+        scored.sort(key=lambda x: -x[0])  # beste zuerst
+        for score, inst in scored[:20 - len(results)]:
+            results.append(inst)
+
     conn.close()
     return results
 
